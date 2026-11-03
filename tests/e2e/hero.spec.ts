@@ -173,7 +173,51 @@ test('god rays stay short and faint (user: natural, not overdone)', async ({ pag
   });
   const SPHERE_R = 72;
   expect(r.reach).toBeLessThanOrEqual(SPHERE_R * 2.5);
-  expect(r.maxOpacity).toBeLessThanOrEqual(0.45);
+  expect(r.maxOpacity).toBeLessThanOrEqual(0.85); // brighter (user), still not solid
   expect(r.count).toBeGreaterThanOrEqual(8);
   expect(r.count).toBeLessThanOrEqual(14); // user: fewer shafts
+});
+
+test.describe('glow and ray tone', () => {
+  const sample = async (page: import('@playwright/test').Page) => {
+    const { createRequire } = await import('node:module');
+    const sharp = createRequire(import.meta.url)('sharp');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    const box = (await page.locator('[data-sphere] [data-body]').boundingBox())!;
+    const R = box.width / 2;
+    const cx = box.x + R;
+    const cy = box.y + R;
+    return async (angleDeg: number, k: number) => {
+      const a = (angleDeg * Math.PI) / 180;
+      const buf = await page.screenshot({ clip: { x: cx + Math.cos(a) * k * R - 4, y: cy + Math.sin(a) * k * R - 4, width: 8, height: 8 } });
+      const st = await sharp(buf).stats();
+      const [r, g, b] = st.channels.slice(0, 3).map((c: { mean: number }) => c.mean);
+      return { r, g, b };
+    };
+  };
+
+  test('the glow just outside the edge matches the sphere (blue-violet, not cyan)', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop');
+    const at = await sample(page);
+    const halo = await at(135, 1.12); // lower-left, away from the rays
+    expect(halo.g - halo.r).toBeLessThanOrEqual(15);
+    expect(halo.b - halo.g).toBeGreaterThanOrEqual(60);
+  });
+
+  test('rays are bright at the root and fade with distance', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop');
+    const at = await sample(page);
+    // Direction of the strongest ray, read from its geometry.
+    const angle = await page.locator('[data-godrays] path').evaluateAll((paths) => {
+      const best = paths.reduce((a, p) => (Number(p.getAttribute('opacity')) > Number(a.getAttribute('opacity')) ? p : a));
+      const n = best.getAttribute('d')!.match(/-?\d+(\.\d+)?/g)!.map(Number);
+      const [x, y] = [(n[2] + n[4]) / 2, (n[3] + n[5]) / 2];
+      return (Math.atan2(y, x) * 180) / Math.PI;
+    });
+    const root = await at(angle, 1.15);
+    const mid = await at(angle, 1.5);
+    expect(root.r).toBeLessThanOrEqual(175); // bright, saturated light at the root
+    expect(mid.r - root.r).toBeGreaterThanOrEqual(35); // clearly paler further out
+  });
 });
