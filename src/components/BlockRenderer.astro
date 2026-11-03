@@ -1,6 +1,7 @@
 ---
 import type { Block } from '../lib/site-schema';
 import RichText from './RichText.astro';
+import { igCrop } from '../lib/ig-crop';
 
 interface Props {
   blocks: Block[];
@@ -55,9 +56,20 @@ const isFirstImage = () => {
           return <hr class="b-divider" />;
         case 'image': {
           const first = isFirstImage();
+          // Detail-page style images (more than 2× taller than wide) show their top at full width.
+          const tall = !!(b.media.width && b.media.height && b.media.height > b.media.width * 2);
           return (
             <figure class="b-media">
-              <a class="frame" data-frame href={b.media.src} target="_blank" rel="noopener" aria-label="Open full-size image">
+              <a
+                class="frame"
+                data-frame
+                data-tall={tall ? '' : undefined}
+                href={b.media.src}
+                target="_blank"
+                rel="noopener"
+                aria-label="Open full-size image"
+                style={tall ? `--natural-w:${b.media.width}px` : undefined}
+              >
                 <img
                   src={b.media.src}
                   width={b.media.width}
@@ -67,10 +79,16 @@ const isFirstImage = () => {
                   fetchpriority={first ? 'high' : undefined}
                   decoding="async"
                 />
+                {tall && <span class="mono view-full">VIEW FULL ↗</span>}
               </a>
-              {b.caption && (
+              {(b.caption || b.source) && (
                 <figcaption class="mono">
-                  <RichText text={b.caption} />
+                  {b.caption && <RichText text={b.caption} />}
+                  {b.source && (
+                    <a class="source" href={b.source} target="_blank" rel="noopener">
+                      OPEN ON INSTAGRAM ↗
+                    </a>
+                  )}
                 </figcaption>
               )}
             </figure>
@@ -82,26 +100,50 @@ const isFirstImage = () => {
               <div class="frame" data-frame>
                 <video src={b.media.src} muted playsinline loop controls preload="metadata" data-inview-play />
               </div>
-              {b.caption && (
+              {(b.caption || b.source) && (
                 <figcaption class="mono">
-                  <RichText text={b.caption} />
+                  {b.caption && <RichText text={b.caption} />}
+                  {b.source && (
+                    <a class="source" href={b.source} target="_blank" rel="noopener">
+                      OPEN ON INSTAGRAM ↗
+                    </a>
+                  )}
                 </figcaption>
               )}
             </figure>
           );
-        case 'embed':
+        case 'embed': {
+          const iframe = (
+            <iframe
+              src={b.embedUrl}
+              title={`${title} — ${b.provider} embed`}
+              loading="lazy"
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowfullscreen
+              referrerpolicy="strict-origin-when-cross-origin"
+              scrolling="no"
+            />
+          );
+          const sizedInstagram = b.provider === 'instagram' && b.aspect;
           return (
             <figure class={`b-embed b-embed--${b.provider}`}>
-              <div class={`frame${b.provider === 'instagram' ? ' frame--portrait' : ''}`} data-frame>
-              <iframe
-                src={b.embedUrl}
-                title={`${title} — ${b.provider} embed`}
-                loading="lazy"
-                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                allowfullscreen
-                referrerpolicy="strict-origin-when-cross-origin"
-              />
-              </div>
+              {sizedInstagram ? (
+                <div class="frame" data-frame>
+                  <div
+                    class="ig-crop"
+                    data-ig-crop
+                    data-w={igCrop(b.aspect!).width}
+                    data-h={igCrop(b.aspect!).height}
+                    style={`--crop-w:${igCrop(b.aspect!).width}px;--crop-h:${igCrop(b.aspect!).height}px;--off-x:${igCrop(b.aspect!).offsetX}px`}
+                  >
+                    {iframe}
+                  </div>
+                </div>
+              ) : (
+                <div class={`frame${b.provider === 'instagram' ? ' frame--portrait' : ''}`} data-frame>
+                  {iframe}
+                </div>
+              )}
               <figcaption class="mono">
                 <a href={b.url} target="_blank" rel="noopener">
                   OPEN ON {b.provider.toUpperCase()} ↗
@@ -109,6 +151,7 @@ const isFirstImage = () => {
               </figcaption>
             </figure>
           );
+        }
         case 'fallback-link':
           return (
             <p class="b-fallback">
@@ -123,13 +166,22 @@ const isFirstImage = () => {
 </div>
 
 <script>
-  // Portrait embeds (Instagram) render at their natural 400×720 and are scaled to the frame height,
-  // so every post keeps the same 16:9 frame without squashing the embed's own layout.
+  // Instagram embeds render at a natural 400px width and are scaled into the 16:9 frame.
+  // Sized posts are cropped to the post itself (Instagram's header and footer stay hidden);
+  // unsized ones fall back to the whole embed scaled to the frame height.
   const NATURAL_H = 720;
-  const portrait = document.querySelectorAll<HTMLElement>('.frame--portrait');
-  const fit = (el: HTMLElement) => el.style.setProperty('--embed-scale', String(el.clientHeight / NATURAL_H));
+  const fit = (frame: HTMLElement) => {
+    const crop = frame.querySelector<HTMLElement>('[data-ig-crop]');
+    if (crop) {
+      const scale = Math.min(frame.clientWidth / Number(crop.dataset.w), frame.clientHeight / Number(crop.dataset.h));
+      crop.style.setProperty('--embed-scale', String(scale));
+    } else {
+      frame.style.setProperty('--embed-scale', String(frame.clientHeight / NATURAL_H));
+    }
+  };
+  const frames = document.querySelectorAll<HTMLElement>('.frame--portrait, .frame:has([data-ig-crop])');
   const ro = new ResizeObserver((entries) => entries.forEach((e) => fit(e.target as HTMLElement)));
-  portrait.forEach((el) => {
+  frames.forEach((el) => {
     fit(el);
     ro.observe(el);
   });
@@ -206,7 +258,35 @@ const isFirstImage = () => {
     border-radius: var(--radius-card);
     background: rgba(0, 0, 0, 0.04);
   }
-  .frame img,
+  .frame {
+    display: grid;
+    place-items: center;
+  }
+  /* Images keep their own pixel size as the upper bound so small files are never stretched (blurred). */
+  .frame img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .frame[data-tall] img {
+    width: min(100%, var(--natural-w));
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+    object-position: 50% 0%;
+    align-self: start;
+  }
+  .view-full {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    padding: 6px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: var(--white);
+  }
   .frame video,
   .frame iframe {
     width: 100%;
@@ -227,12 +307,39 @@ const isFirstImage = () => {
     transform: translateX(-50%) scale(var(--embed-scale, 1));
     background: var(--white);
   }
+  /* Crop window = the post only. The embed's 54px profile header sits above it and its footer below. */
+  .ig-crop {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--crop-w);
+    height: var(--crop-h);
+    overflow: hidden;
+    transform: translate(-50%, -50%) scale(var(--embed-scale, 1));
+  }
+  .frame .ig-crop iframe {
+    position: absolute;
+    top: -54px;
+    left: calc(-1 * var(--off-x));
+    width: 400px;
+    max-width: none;
+    /* Same viewport the crop numbers were measured in; Instagram sizes media by viewport. */
+    height: 900px;
+    object-fit: initial;
+  }
   figcaption {
     padding-top: 8px;
     color: var(--muted);
   }
   figcaption a {
     text-decoration: none;
+  }
+  figcaption .source {
+    display: inline-block;
+    margin-left: 12px;
+  }
+  figcaption .source:first-child {
+    margin-left: 0;
   }
   figcaption a:hover {
     color: var(--ink);

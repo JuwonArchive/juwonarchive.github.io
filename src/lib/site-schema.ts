@@ -7,9 +7,9 @@ export type Block =
   | { type: 'list'; ordered: boolean; items: RichText[] }
   | { type: 'quote'; text: RichText }
   | { type: 'divider' }
-  | { type: 'image'; media: Media; caption?: RichText }
-  | { type: 'video'; media: Media; caption?: RichText }
-  | { type: 'embed'; url: string; embedUrl: string; provider: EmbedProvider; caption?: RichText }
+  | { type: 'image'; media: Media; caption?: RichText; /** original post (e.g. Instagram) */ source?: string }
+  | { type: 'video'; media: Media; caption?: RichText; /** original post (e.g. Instagram) */ source?: string }
+  | { type: 'embed'; url: string; embedUrl: string; provider: EmbedProvider; caption?: RichText; /** width / height of the post itself (Instagram) */ aspect?: number }
   | { type: 'fallback-link'; url: string; label: string };
 export type Work = {
   slug: string;

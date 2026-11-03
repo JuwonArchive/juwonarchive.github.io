@@ -108,3 +108,85 @@ test.describe('uniform media frames', () => {
     await expect(link).toHaveAttribute('target', '_blank');
   });
 });
+
+test.describe('instagram crop', () => {
+  const igWork = site.works.find((w) => w.blocks.some((b) => b.type === 'embed' && 'aspect' in b && b.aspect));
+  test('shows only the post, cropped to its own aspect and centred in the frame', async ({ page }) => {
+    test.skip(!igWork, 'no sized Instagram embeds');
+    await page.goto(`/works/${igWork!.slug}`);
+    const aspects = igWork!.blocks.filter((b) => b.type === 'embed' && 'aspect' in b && b.aspect).map((b) => (b as { aspect: number }).aspect);
+    const boxes = await page.locator('[data-ig-crop]').evaluateAll((els) =>
+      els.map((el) => {
+        const crop = el.getBoundingClientRect();
+        const frame = el.closest('[data-frame]')!.getBoundingClientRect();
+        const iframe = el.querySelector('iframe')!.getBoundingClientRect();
+        return { crop: crop.toJSON(), frame: frame.toJSON(), headerHidden: iframe.top < crop.top - 1 };
+      }),
+    );
+    expect(boxes.length).toBe(aspects.length);
+    boxes.forEach(({ crop, frame, headerHidden }, i) => {
+      expect(Math.abs(crop.width / crop.height - aspects[i])).toBeLessThan(0.03);
+      expect(crop.left).toBeGreaterThanOrEqual(frame.left - 1);
+      expect(crop.right).toBeLessThanOrEqual(frame.right + 1);
+      expect(crop.top).toBeGreaterThanOrEqual(frame.top - 1);
+      expect(crop.bottom).toBeLessThanOrEqual(frame.bottom + 1);
+      // Fills the frame on one axis.
+      expect(Math.max(crop.width / frame.width, crop.height / frame.height)).toBeGreaterThan(0.98);
+      expect(headerHidden).toBe(true);
+    });
+  });
+});
+
+test.describe('resolution and sources', () => {
+  test('images are never stretched beyond their original pixels', async ({ page }) => {
+    for (const w of site.works.filter((x) => x.blocks.some((b) => b.type === 'image'))) {
+      await page.goto(`/works/${w.slug}`);
+      const imgs = page.locator('[data-frame] img');
+      for (const img of await imgs.all()) {
+        await img.scrollIntoViewIfNeeded();
+        await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+        const r = await img.evaluate((el: HTMLImageElement) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, nw: el.naturalWidth, nh: el.naturalHeight }));
+        // Fitting down is fine; stretching up past the image's own pixels blurs it.
+        expect(r.w).toBeLessThanOrEqual(r.nw + 1);
+        expect(r.h).toBeLessThanOrEqual(r.nh + 1);
+      }
+    }
+  });
+
+  test('posts copied from Instagram link back to the original post', async ({ page }) => {
+    const w = site.works.find((x) => x.blocks.some((b) => 'source' in b && b.source));
+    test.skip(!w, 'no Instagram originals');
+    await page.goto(`/works/${w!.slug}`);
+    const sources = w!.blocks.filter((b) => 'source' in b && b.source).map((b) => (b as { source: string }).source);
+    for (const src of sources) {
+      const link = page.locator(`figcaption a[href="${src}"]`);
+      await expect(link).toHaveText('OPEN ON INSTAGRAM ↗');
+      await expect(link).toHaveAttribute('target', '_blank');
+    }
+  });
+});
+
+
+test.describe('tall images', () => {
+  const tallWork = site.works.find((w) => w.blocks.some((b) => b.type === 'image' && b.media.height! > b.media.width! * 2));
+  test('show their top at a readable width and open full size on click', async ({ page }) => {
+    test.skip(!tallWork, 'no tall images');
+    await page.goto(`/works/${tallWork!.slug}`);
+    const tall = page.locator('a[data-frame][data-tall]');
+    expect(await tall.count()).toBeGreaterThan(0);
+    for (const frame of await tall.all()) {
+      await frame.scrollIntoViewIfNeeded();
+      const img = frame.locator('img');
+      await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+      const r = await img.evaluate((el: HTMLImageElement) => ({
+        w: el.getBoundingClientRect().width,
+        nw: el.naturalWidth,
+        fw: el.closest('[data-frame]')!.getBoundingClientRect().width,
+        pos: getComputedStyle(el).objectPosition,
+      }));
+      expect(r.w).toBeGreaterThanOrEqual(Math.min(r.nw, r.fw) * 0.99);
+      expect(r.w).toBeLessThanOrEqual(r.nw + 1);
+      expect(r.pos.startsWith('50% 0%')).toBe(true);
+    }
+  });
+});

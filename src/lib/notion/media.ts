@@ -5,14 +5,16 @@ import type { Block, Media, SiteData, Warning } from '../site-schema';
 
 /** GitHub Pages rejects files over 100 MB; keep a margin. */
 export const MAX_BYTES = 99_614_720;
-const MAX_EDGE = 2400;
+/** 2× the 1280px frame. Height is only capped by WebP's limit, so tall detail-page images keep their width. */
+const MAX_WIDTH = 2560;
+const MAX_WEBP_SIDE = 16383;
 
-type IO = {
+export type IO = {
   download(url: string): Promise<Buffer>;
   toWebp(buf: Buffer): Promise<{ buf: Buffer; width: number; height: number }>;
 };
 
-const defaultIO: IO = {
+export const defaultIO: IO = {
   async download(url) {
     // Some file hosts reject requests without a user agent.
     const res = await fetch(url, { headers: { 'user-agent': 'juwon-portfolio-sync/1.0' } });
@@ -22,7 +24,7 @@ const defaultIO: IO = {
   async toWebp(buf) {
     const { data, info } = await sharp(buf, { animated: true })
       .rotate()
-      .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
+      .resize({ width: MAX_WIDTH, height: MAX_WEBP_SIDE, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 82 })
       .toBuffer({ resolveWithObject: true });
     return { buf: data, width: info.width, height: info.pageHeight ?? info.height };

@@ -80,3 +80,22 @@ describe('localizeMedia', () => {
     expect(bad.works[0].cover).toBeUndefined();
   });
 });
+
+describe('defaultIO.toWebp', () => {
+  it('keeps tall images (detail pages) at full width instead of shrinking by the long edge', async () => {
+    const { defaultIO } = await import('../../src/lib/notion/media');
+    const sharp = (await import('sharp')).default;
+    const tall = await sharp({ create: { width: 1000, height: 8000, channels: 3, background: '#fff' } }).png().toBuffer();
+    const out = await defaultIO.toWebp(tall);
+    expect(out.width).toBe(1000);
+    expect(out.height).toBe(8000);
+  });
+  it('caps very wide images at 2560px wide', async () => {
+    const { defaultIO } = await import('../../src/lib/notion/media');
+    const sharp = (await import('sharp')).default;
+    const wide = await sharp({ create: { width: 5120, height: 2880, channels: 3, background: '#fff' } }).png().toBuffer();
+    const out = await defaultIO.toWebp(wide);
+    expect(out.width).toBe(2560);
+    expect(out.height).toBe(1440);
+  });
+});
