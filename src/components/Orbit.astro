@@ -24,7 +24,7 @@ const shells = works.map((w, i) => {
     dir: i % 2 ? 'reverse' : 'normal',
     electrons: labels.map((label, k) => {
       const a = ((offset + (360 / labels.length) * k) * Math.PI) / 180;
-      return { x: Math.cos(a) * r, y: Math.sin(a) * r, lx: Math.cos(a) * (r + 22), ly: Math.sin(a) * (r + 22), label };
+      return { x: Math.cos(a) * r, y: Math.sin(a) * r, label };
     }),
   };
 });
@@ -53,8 +53,10 @@ const outer = R0 + (works.length - 1) * STEP + 70;
           <g data-electron>
             <circle class="electron" cx={e.x} cy={e.y} r="7" />
             {e.label && (
-              <g class="tag" style={`transform-origin:${e.lx}px ${e.ly}px`}>
-                <text x={e.lx} y={e.ly} text-anchor="middle" dominant-baseline="middle">
+              // Pinned to its dot and turned back as the shell turns, so the label keeps
+              // the same on-screen offset (to the right of the dot) and never covers it.
+              <g class="tag" style={`transform-origin:${e.x}px ${e.y}px`}>
+                <text x={e.x + 14} y={e.y} dominant-baseline="middle">
                   {e.label}
                 </text>
               </g>
@@ -95,6 +97,11 @@ const outer = R0 + (works.length - 1) * STEP + 70;
     fill: var(--ink);
   }
   text {
+    /* A thin page-coloured halo keeps labels readable where they cross a ring. */
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 5px;
+    stroke-linejoin: round;
     font-family: var(--font-mono);
     font-size: 15px;
     letter-spacing: 0.04em;

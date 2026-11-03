@@ -61,3 +61,29 @@ test.describe('opening animation', () => {
     await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 300 });
   });
 });
+
+test('tool labels never sit on top of their dot, at any point in the rotation', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
+  for (const progress of [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]) {
+    // Jump every running animation to the same fraction of its cycle.
+    await page.evaluate((p) => {
+      for (const a of document.getAnimations()) {
+        const d = Number(a.effect?.getTiming().duration) || 0;
+        if (d) a.currentTime = d * p;
+        a.pause();
+      }
+    }, progress);
+    const hits = await page.locator('[data-electron]').evaluateAll((els) =>
+      els.flatMap((el) => {
+        const dot = el.querySelector('circle')!.getBoundingClientRect();
+        const text = el.querySelector('text');
+        if (!text || !text.textContent) return [];
+        const t = text.getBoundingClientRect();
+        const overlap = !(t.right < dot.left || t.left > dot.right || t.bottom < dot.top || t.top > dot.bottom);
+        return overlap ? [text.textContent] : [];
+      }),
+    );
+    expect(hits, `at ${progress * 100}% of the cycle`).toEqual([]);
+  }
+});
