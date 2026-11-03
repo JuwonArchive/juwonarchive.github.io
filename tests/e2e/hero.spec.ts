@@ -72,6 +72,15 @@ test.describe('home graphics', () => {
     expect(labels.map((l) => l.toUpperCase())).toContain('BLENDER');
   });
 
+  test('on phones the sphere sits in the vertical middle (user)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'phone layout');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    const cy = Number(await page.locator('canvas[data-halftone]').getAttribute('data-cy'));
+    const h = page.viewportSize()!.height;
+    expect(Math.abs(cy - h / 2)).toBeLessThan(h * 0.05);
+  });
+
   test('dot sizes vary continuously (not one size)', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
@@ -104,7 +113,8 @@ test.describe('home graphics', () => {
     expect((r + g + b) / 3).toBeGreaterThan(195); // lighter than before (#a9b4bf ≈ 180)
   });
 
-  test('the artwork may run behind JUWON (no cut-off zone)', async ({ page }) => {
+  test('the artwork may run behind JUWON (no cut-off zone)', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'on phones the sphere is centred (user)');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const h1 = (await page.locator('h1').boundingBox())!;

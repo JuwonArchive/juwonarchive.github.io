@@ -68,7 +68,7 @@ export function mountOrbitHalftone(opts: Opts) {
     const mobile = w < 768;
     const R = mobile ? w * 0.44 : Math.min(w * 0.24, h * 0.38);
     const cx = w * (mobile ? 0.5 : 0.55);
-    const cy = h * (mobile ? 0.63 : 0.5);
+    const cy = h * 0.5; // centred on phones and desktop
     const yaw = pose.yaw + t * 0.08;
     const pitch = 0.32 + pose.pitch;
     const [cy_, sy_, cp, sp] = [Math.cos(yaw), Math.sin(yaw), Math.cos(pitch), Math.sin(pitch)];
@@ -260,6 +260,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.globalAlpha = 1;
       lines.dataset.labels = JSON.stringify(shown);
     }
+    dots.dataset.cy = String(Math.round(g.cy));
     dots.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
   };
 
