@@ -103,8 +103,9 @@ test.describe('core sphere', () => {
     await expect(sphere.locator('[data-bands]')).toHaveCount(0);
     const fluid = sphere.locator('[data-fluid]');
     await expect(fluid).toHaveCount(1);
-    const colours = await fluid.locator('[data-blob]').evaluateAll((els) => els.map((e) => e.getAttribute('data-blob')));
-    expect(new Set(colours)).toEqual(new Set(['blue', 'purple', 'sky']));
+    // Palette (user): #F0FAFF, #49C2FF, #4963FD, #443BE3.
+    const fills = await fluid.locator('[data-blob]').evaluateAll((els) => els.map((e) => e.getAttribute('fill')!.toLowerCase()));
+    expect(new Set(fills)).toEqual(new Set(['#f0faff', '#49c2ff', '#4963fd', '#443be3']));
     expect(await fluid.getAttribute('filter')).toMatch(/url\(#fluid\)/);
     await expect(sphere.locator('[data-specular]')).toHaveCount(1);
     await expect(sphere.locator('[data-glow]')).toHaveCount(1);
@@ -121,22 +122,13 @@ test.describe('core sphere', () => {
   });
 });
 
-test('the white crescent reaches well into the sphere (user: stronger white light)', async ({ page }, info) => {
-  test.skip(info.project.name !== 'desktop', 'measured once at desktop size');
-  const { createRequire } = await import('node:module');
-  const sharp = createRequire(import.meta.url)('sharp');
-  await page.emulateMedia({ reducedMotion: 'reduce' }); // freeze the bands so the measurement is stable
+test('the white reflection is restrained and changes over time (user)', async ({ page }) => {
   await page.goto('/');
-  const box = (await page.locator('[data-sphere] [data-body]').boundingBox())!;
-  const r = box.width / 2;
-  const at = async (dx: number, dy: number) => {
-    const buf = await page.screenshot({ clip: { x: box.x + r + dx * r - 6, y: box.y + r + dy * r - 6, width: 12, height: 12 } });
-    const st = await sharp(buf).stats();
-    return (st.channels[0].mean + st.channels[1].mean + st.channels[2].mean) / 3;
-  };
-  expect(await at(0.22, -0.3)).toBeGreaterThanOrEqual(215);
-  // The rest of the sphere stays blue.
-  expect(await at(-0.2, 0.2)).toBeLessThan(200);
+  const anim = page.locator('[data-specular] animate[attributeName="opacity"]');
+  await expect(anim).toHaveCount(1);
+  const values = (await anim.getAttribute('values'))!.split(';').map(Number);
+  expect(Math.max(...values)).toBeLessThanOrEqual(0.7);
+  expect(Math.min(...values)).toBeLessThanOrEqual(0.25);
 });
 
 test.describe('god rays', () => {
@@ -248,4 +240,16 @@ test.describe('ray motion and orbit spacing', () => {
     const radii = await page.locator('[data-orbit] .ring').evaluateAll((rs) => rs.map((r) => Number(r.getAttribute('r'))));
     for (let i = 1; i < radii.length; i++) expect(radii[i] - radii[i - 1]).toBeGreaterThanOrEqual(110);
   });
+});
+
+test('sphere is sized in proportion to the orbits', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(() => {
+    const body = document.querySelector('[data-sphere] [data-body]')!.getBoundingClientRect();
+    const ring = document.querySelector('[data-orbit] .ring')!.getBoundingClientRect();
+    return body.width / ring.width;
+  });
+  // Sphere diameter ≈ 55–70% of the first orbit.
+  expect(r).toBeGreaterThanOrEqual(0.55);
+  expect(r).toBeLessThanOrEqual(0.7);
 });
