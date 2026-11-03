@@ -205,3 +205,15 @@ test('graphic is horizontally centred on desktop (user)', async ({ page, isMobil
   const cx = Number(await page.locator('canvas[data-halftone]').getAttribute('data-cx'));
   expect(Math.abs(cx - page.viewportSize()!.width / 2)).toBeLessThan(2);
 });
+
+test('no background micro-dots; smaller max dots; paler colour (user)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const c = page.locator('canvas[data-halftone]');
+  expect(await c.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none');
+  expect(Number(await c.getAttribute('data-max-r'))).toBeLessThanOrEqual(3.5);
+  expect(Number(await c.getAttribute('data-min-r'))).toBeGreaterThanOrEqual(1);
+  const color = (await c.getAttribute('data-dot-color'))!;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+  expect((r + g + b) / 3).toBeGreaterThan(228);
+});

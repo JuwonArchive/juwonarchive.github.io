@@ -159,13 +159,15 @@ export function mountOrbitHalftone(opts: Opts) {
     dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     dctx.clearRect(0, 0, w, h);
     dctx.fillStyle = opts.dotColor;
-    const max = PITCH * 0.5;
+    // Smallest dot 1px (no micro-dots), largest 3.4px.
+    const MIN_R = 1;
+    const max = 3.4;
     const buckets = new Map<number, Path2D>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
         const a = Math.min(1, field[yy * cols + xx]);
-        if (a < 0.04) continue;
-        const rq = Math.round((0.6 + (max - 0.6) * Math.pow(a, 0.85)) * 4); // quarter-px steps
+        if (a < 0.12) continue;
+        const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow((a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
         const aq = Math.round((0.45 + 0.55 * a) * 6); // 6 alpha steps
         const key = rq * 16 + aq;
         let path = buckets.get(key);
@@ -183,6 +185,8 @@ export function mountOrbitHalftone(opts: Opts) {
     }
     dctx.globalAlpha = 1;
     dots.dataset.sizeSteps = String(sizes.size);
+    dots.dataset.maxR = String(max);
+    dots.dataset.minR = String(MIN_R);
     dots.dataset.readback = 'none';
     dots.dataset.cx = String(Math.round(g.cx));
 
