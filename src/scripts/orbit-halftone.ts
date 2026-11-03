@@ -43,6 +43,27 @@ export function mountOrbitHalftone(opts: Opts) {
   if (!dctx) return;
   dots.dataset.form = 'orbit';
   let field = new Float32Array(0);
+  // Each dot size is pre-rendered once as a softly blurred stamp, then reused every frame.
+  const BLUR = 0.5;
+  const SPRITE_DPR = 2;
+  const stamps = new Map<number, HTMLCanvasElement>();
+  const stamp = (rq: number) => {
+    let c = stamps.get(rq);
+    if (c) return c;
+    const r = rq / 4;
+    const size = Math.ceil((r + BLUR * 3) * 2 * SPRITE_DPR);
+    c = document.createElement('canvas');
+    c.width = c.height = size;
+    const x = c.getContext('2d')!;
+    x.filter = `blur(${BLUR * SPRITE_DPR}px)`;
+    x.fillStyle = opts.dotColor;
+    x.beginPath();
+    x.arc(size / 2, size / 2, r * SPRITE_DPR, 0, TAU);
+    x.fill();
+    stamps.set(rq, c);
+    return c;
+  };
+  dots.dataset.blur = String(BLUR);
   // Halftone dots are soft by nature; 1.5× is plenty and cheaper on retina screens.
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   let w = 0;
@@ -162,7 +183,7 @@ export function mountOrbitHalftone(opts: Opts) {
     // Smallest dot 1px (no micro-dots), largest 3.4px.
     const MIN_R = 1;
     const max = 3.4;
-    const buckets = new Map<number, Path2D>();
+    const buckets = new Map<number, number[]>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
         const a = Math.min(1, field[yy * cols + xx]);
@@ -170,18 +191,17 @@ export function mountOrbitHalftone(opts: Opts) {
         const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow((a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
         const aq = Math.round((0.45 + 0.55 * a) * 6); // 6 alpha steps
         const key = rq * 16 + aq;
-        let path = buckets.get(key);
-        if (!path) buckets.set(key, (path = new Path2D()));
-        const x = xx * PITCH + PITCH / 2;
-        const y = yy * PITCH + PITCH / 2;
-        path.moveTo(x + rq / 4, y);
-        path.arc(x, y, rq / 4, 0, TAU);
+        let list = buckets.get(key);
+        if (!list) buckets.set(key, (list = []));
+        list.push(xx * PITCH + PITCH / 2, yy * PITCH + PITCH / 2);
       }
     const sizes = new Set<number>();
-    for (const [key, path] of buckets) {
+    for (const [key, list] of buckets) {
       sizes.add(key >> 4);
       dctx.globalAlpha = (key & 15) / 6;
-      dctx.fill(path);
+      const sprite = stamp(key >> 4);
+      const half = sprite.width / SPRITE_DPR / 2;
+      for (let i = 0; i < list.length; i += 2) dctx.drawImage(sprite, list[i] - half, list[i + 1] - half, half * 2, half * 2);
     }
     dctx.globalAlpha = 1;
     dots.dataset.sizeSteps = String(sizes.size);

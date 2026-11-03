@@ -217,3 +217,13 @@ test('no background micro-dots; smaller max dots; paler colour (user)', async ({
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   expect((r + g + b) / 3).toBeGreaterThan(228);
 });
+
+test('halftone has a very slight blur (user)', async ({ page }) => {
+  await page.goto('/');
+  // Blur is baked into pre-rendered dot stamps (no per-frame full-screen filter).
+  const c = page.locator('canvas[data-halftone]');
+  expect(await c.evaluate((el) => getComputedStyle(el).filter)).toBe('none');
+  const px = Number(await c.getAttribute('data-blur'));
+  expect(px).toBeGreaterThan(0.2);
+  expect(px).toBeLessThanOrEqual(0.8);
+});
