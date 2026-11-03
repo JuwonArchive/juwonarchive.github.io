@@ -1,0 +1,25 @@
+---
+import type { RichText } from '../lib/site-schema';
+
+interface Props {
+  text: RichText;
+}
+const { text } = Astro.props;
+const external = (href: string) => /^https?:\/\//.test(href);
+---
+
+{
+  text.map((seg) => {
+    let node = seg.text;
+    const Tag = seg.code ? 'code' : seg.bold ? 'strong' : seg.italic ? 'em' : null;
+    return seg.href ? (
+      <a href={seg.href} target={external(seg.href) ? '_blank' : undefined} rel={external(seg.href) ? 'noopener' : undefined}>
+        {Tag ? <Tag>{node}</Tag> : node}
+      </a>
+    ) : Tag ? (
+      <Tag>{node}</Tag>
+    ) : (
+      node
+    );
+  })
+}

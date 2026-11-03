@@ -1,0 +1,113 @@
+---
+import Base from '../../layouts/Base.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import BlockRenderer from '../../components/BlockRenderer.astro';
+import { loadSite } from '../../data/load';
+import { config } from '../../config';
+import { longestWord } from '../../lib/fit';
+import type { Work } from '../../lib/site-schema';
+
+export function getStaticPaths() {
+  const { works } = loadSite();
+  return works.map((work, i) => ({
+    params: { slug: work.slug },
+    props: {
+      work,
+      index: i,
+      prev: works[(i - 1 + works.length) % works.length],
+      next: works[(i + 1) % works.length],
+    },
+  }));
+}
+
+interface Props {
+  work: Work;
+  index: number;
+  prev: Work;
+  next: Work;
+}
+const { work, index, prev, next } = Astro.props;
+const { contact } = loadSite();
+const tint = config.pastels[index % config.pastels.length];
+---
+
+<Base title={`${work.titleEn} — JUWON`} description={`${work.titleEn} — ${work.tags.join(', ')}. Work by JUWON.`}>
+  <Nav slot="header" current="works" />
+  <main class="work">
+    <header class="head">
+      <p class="mono num">{String(index + 1).padStart(2, '0')} / {String(loadSite().works.length).padStart(2, '0')}</p>
+      <h1 class="display fit title" style={`--chars:${longestWord(work.titleEn)}`}>{work.titleEn}</h1>
+      <div class="meta">
+        {work.tags.map((t) => <span class="pill tag">{t}</span>)}
+        {
+          work.link && (
+            <a class="pill" href={work.link} target="_blank" rel="noopener">
+              ↗ LINK
+            </a>
+          )
+        }
+      </div>
+    </header>
+
+    <BlockRenderer blocks={work.blocks} title={work.titleEn} />
+
+    <nav class="pager" aria-label="Works">
+      <a class="pill" href={`/works/${prev.slug}`}>← PREV</a>
+      {contact.email && <a class="pill" href={`mailto:${contact.email}`}>CONTACT</a>}
+      <a class="pill" href={`/works/${next.slug}`}>NEXT →</a>
+    </nav>
+  </main>
+  <Footer slot="footer" />
+</Base>
+
+<style define:vars={{ tint }}>
+  .work {
+    padding: 120px var(--gutter) 64px;
+  }
+  .head {
+    margin: 0 auto 64px;
+    max-width: 1200px;
+    padding: 40px 0;
+    border-radius: var(--radius-card);
+  }
+  .head::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 70svh;
+    background: linear-gradient(var(--tint), transparent);
+    z-index: -1;
+  }
+  .num {
+    margin: 0 0 16px;
+    color: var(--muted);
+  }
+  .title {
+    --fit-max: 200px;
+    --fit-width: (min(100vw, 1200px + 2 * var(--gutter)) - 2 * var(--gutter));
+    margin-left: -0.04em;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 24px;
+  }
+  .tag {
+    cursor: default;
+    text-transform: none;
+  }
+  .tag:hover {
+    background: var(--white);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    max-width: 1200px;
+    margin: 96px auto 0;
+  }
+</style>

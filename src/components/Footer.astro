@@ -1,0 +1,37 @@
+---
+import { loadSite } from '../data/load';
+const { contact } = loadSite();
+---
+
+<footer class="footer mono">
+  {contact.location && <span>{contact.location.toUpperCase()}</span>}
+  <span data-clock>--:-- KST</span>
+  {contact.email && <a href={`mailto:${contact.email}`}>{contact.email}</a>}
+</footer>
+
+<script>
+  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+  const tick = () => {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-clock]')) el.textContent = `${fmt.format(new Date())} KST`;
+  };
+  tick();
+  setInterval(tick, 30_000);
+</script>
+
+<style>
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding: var(--gutter);
+    color: var(--muted);
+  }
+  .footer a {
+    color: var(--ink);
+    text-transform: none;
+    text-decoration: none;
+  }
+  .footer a:hover {
+    text-decoration: underline;
+  }
+</style>

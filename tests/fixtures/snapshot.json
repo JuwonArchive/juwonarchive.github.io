@@ -1,0 +1,789 @@
+{
+  "rootBlocks": [
+    {
+      "id": "column_list-0019",
+      "type": "column_list",
+      "column_list": {},
+      "has_children": true,
+      "children": [
+        {
+          "id": "column-0016",
+          "type": "column",
+          "column": {},
+          "has_children": true,
+          "children": [
+            {
+              "id": "heading_1-0001",
+              "type": "heading_1",
+              "heading_1": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "Contact",
+                    "text": {
+                      "content": "Contact",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "paragraph-0002",
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": []
+              }
+            },
+            {
+              "id": "child_page-0003",
+              "type": "child_page",
+              "child_page": {
+                "title": "010-0000-0000"
+              }
+            },
+            {
+              "id": "child_page-0004",
+              "type": "child_page",
+              "child_page": {
+                "title": "ILSAN, Korea"
+              }
+            },
+            {
+              "id": "child_page-0005",
+              "type": "child_page",
+              "child_page": {
+                "title": "juwon0824@naver.com"
+              }
+            },
+            {
+              "id": "child_page-0006",
+              "type": "child_page",
+              "child_page": {
+                "title": "@baboyeonggaam"
+              }
+            },
+            {
+              "id": "divider-0007",
+              "type": "divider",
+              "divider": {}
+            },
+            {
+              "id": "heading_1-0008",
+              "type": "heading_1",
+              "heading_1": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "Education & Employment",
+                    "text": {
+                      "content": "Education & Employment",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "paragraph-0009",
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": []
+              }
+            },
+            {
+              "id": "bulleted_list_item-0010",
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "강동고등학교 2016~2019",
+                    "text": {
+                      "content": "강동고등학교 2016~2019",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "bulleted_list_item-0011",
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "장안대학교 멀티미디어컨텐츠과 2019~2024",
+                    "text": {
+                      "content": "장안대학교 멀티미디어컨텐츠과 2019~2024",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "bulleted_list_item-0012",
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "GEMSHO 인턴 24.09~24.11",
+                    "text": {
+                      "content": "GEMSHO 인턴 24.09~24.11",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "bulleted_list_item-0013",
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "KNOWCK 일경험인턴 26.01 ~ 26.02",
+                    "text": {
+                      "content": "KNOWCK 일경험인턴 26.01 ~ 26.02",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "bulleted_list_item-0014",
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "MSHN 3D 디자이너 26.03~26.05",
+                    "text": {
+                      "content": "MSHN 3D 디자이너 26.03~26.05",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            },
+            {
+              "id": "bulleted_list_item-0015",
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "plain_text": "WNT Studio 그래픽 디자이너 26.09~",
+                    "text": {
+                      "content": "WNT Studio 그래픽 디자이너 26.09~",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "code": false
+                    },
+                    "href": null
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "column-0018",
+          "type": "column",
+          "column": {},
+          "has_children": true,
+          "children": [
+            {
+              "id": "child_database-0017",
+              "type": "child_database",
+              "child_database": {
+                "title": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "child_database-0020",
+      "type": "child_database",
+      "child_database": {
+        "title": "Projects"
+      }
+    }
+  ],
+  "projects": [
+    {
+      "id": "page-0024",
+      "properties": {
+        "이름": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "3D 디자인",
+              "text": {
+                "content": "3D 디자인",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "태그": {
+          "type": "multi_select",
+          "multi_select": [
+            {
+              "name": "3D"
+            },
+            {
+              "name": "cinema4d"
+            },
+            {
+              "name": "그래픽 디자인"
+            },
+            {
+              "name": "Blender"
+            }
+          ]
+        },
+        "커버": {
+          "type": "files",
+          "files": [
+            {
+              "name": "casual_artwork.jpg",
+              "type": "file",
+              "file": {
+                "url": "https://prod-files.example/casual_artwork.jpg?X-Amz-Signature=abc"
+              }
+            }
+          ]
+        },
+        "관련 링크": {
+          "type": "url",
+          "url": "https://www.instagram.com/baboyeonggaam/"
+        }
+      },
+      "blocks": [
+        {
+          "id": "heading_3-0021",
+          "type": "heading_3",
+          "heading_3": {
+            "rich_text": [
+              {
+                "type": "text",
+                "plain_text": "작업물",
+                "text": {
+                  "content": "작업물",
+                  "link": null
+                },
+                "annotations": {
+                  "bold": false,
+                  "italic": false,
+                  "code": false
+                },
+                "href": null
+              }
+            ]
+          }
+        },
+        {
+          "id": "image-0022",
+          "type": "image",
+          "image": {
+            "type": "file",
+            "file": {
+              "url": "https://prod-files.example/render.png?X-Amz-Signature=abc"
+            },
+            "caption": []
+          }
+        },
+        {
+          "id": "divider-0023",
+          "type": "divider",
+          "divider": {}
+        }
+      ],
+      "url": "https://www.notion.so/3D-page-0024"
+    },
+    {
+      "id": "page-0028",
+      "properties": {
+        "이름": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "AI 생성",
+              "text": {
+                "content": "AI 생성",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "태그": {
+          "type": "multi_select",
+          "multi_select": [
+            {
+              "name": "Midjourney"
+            },
+            {
+              "name": "Runway"
+            },
+            {
+              "name": "Kling"
+            }
+          ]
+        },
+        "커버": {
+          "type": "files",
+          "files": [
+            {
+              "name": "deer.png",
+              "type": "file",
+              "file": {
+                "url": "https://prod-files.example/deer.png?X-Amz-Signature=abc"
+              }
+            }
+          ]
+        },
+        "관련 링크": {
+          "type": "url",
+          "url": null
+        }
+      },
+      "blocks": [
+        {
+          "id": "paragraph-0025",
+          "type": "paragraph",
+          "paragraph": {
+            "rich_text": [
+              {
+                "type": "text",
+                "plain_text": "리플리-소녀의일기 EP 비주얼라이징 작업",
+                "text": {
+                  "content": "리플리-소녀의일기 EP 비주얼라이징 작업",
+                  "link": null
+                },
+                "annotations": {
+                  "bold": false,
+                  "italic": false,
+                  "code": false
+                },
+                "href": null
+              }
+            ]
+          }
+        },
+        {
+          "id": "video-0026",
+          "type": "video",
+          "video": {
+            "type": "file",
+            "file": {
+              "url": "https://prod-files.example/ep.mp4?X-Amz-Signature=abc"
+            },
+            "caption": []
+          }
+        },
+        {
+          "id": "embed-0027",
+          "type": "embed",
+          "embed": {
+            "url": "https://www.instagram.com/p/XYZ/",
+            "caption": []
+          }
+        }
+      ],
+      "url": "https://www.notion.so/AI-page-0028"
+    },
+    {
+      "id": "page-0031",
+      "properties": {
+        "이름": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "2D",
+              "text": {
+                "content": "2D",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "태그": {
+          "type": "multi_select",
+          "multi_select": [
+            {
+              "name": "Photoshop"
+            },
+            {
+              "name": "Illustrator"
+            }
+          ]
+        },
+        "커버": {
+          "type": "files",
+          "files": [
+            {
+              "name": "image.png",
+              "type": "file",
+              "file": {
+                "url": "https://prod-files.example/image.png?X-Amz-Signature=abc"
+              }
+            }
+          ]
+        },
+        "관련 링크": {
+          "type": "url",
+          "url": null
+        }
+      },
+      "blocks": [
+        {
+          "id": "paragraph-0029",
+          "type": "paragraph",
+          "paragraph": {
+            "rich_text": [
+              {
+                "type": "text",
+                "plain_text": "포토샵 개인작업",
+                "text": {
+                  "content": "포토샵 개인작업",
+                  "link": null
+                },
+                "annotations": {
+                  "bold": false,
+                  "italic": false,
+                  "code": false
+                },
+                "href": null
+              }
+            ]
+          }
+        },
+        {
+          "id": "image-0030",
+          "type": "image",
+          "image": {
+            "type": "file",
+            "file": {
+              "url": "https://prod-files.example/2d.png?X-Amz-Signature=abc"
+            },
+            "caption": []
+          }
+        }
+      ],
+      "url": "https://www.notion.so/2D-page-0031"
+    },
+    {
+      "id": "page-0033",
+      "properties": {
+        "이름": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "TouchDesigner",
+              "text": {
+                "content": "TouchDesigner",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "태그": {
+          "type": "multi_select",
+          "multi_select": [
+            {
+              "name": "TouchDesigner"
+            }
+          ]
+        },
+        "커버": {
+          "type": "files",
+          "files": []
+        },
+        "관련 링크": {
+          "type": "url",
+          "url": null
+        }
+      },
+      "blocks": [
+        {
+          "id": "embed-0032",
+          "type": "embed",
+          "embed": {
+            "url": "https://www.youtube.com/watch?v=abc123",
+            "caption": []
+          }
+        }
+      ],
+      "url": "https://www.notion.so/TD-page-0033"
+    }
+  ],
+  "skills": [
+    {
+      "id": "skill-0034",
+      "properties": {
+        "Name": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "Daz 3d",
+              "text": {
+                "content": "Daz 3d",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "Type": {
+          "type": "select",
+          "select": {
+            "name": "Software"
+          }
+        }
+      },
+      "blocks": []
+    },
+    {
+      "id": "skill-0035",
+      "properties": {
+        "Name": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "Cinema4D",
+              "text": {
+                "content": "Cinema4D",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "Type": {
+          "type": "select",
+          "select": {
+            "name": "Software"
+          }
+        }
+      },
+      "blocks": []
+    },
+    {
+      "id": "skill-0036",
+      "properties": {
+        "Name": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "Adobe Photoshop",
+              "text": {
+                "content": "Adobe Photoshop",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "Type": {
+          "type": "select",
+          "select": {
+            "name": "Software"
+          }
+        }
+      },
+      "blocks": []
+    },
+    {
+      "id": "skill-0037",
+      "properties": {
+        "Name": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "Team Management",
+              "text": {
+                "content": "Team Management",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "Type": {
+          "type": "select",
+          "select": {
+            "name": "Expertise"
+          }
+        }
+      },
+      "blocks": []
+    },
+    {
+      "id": "skill-0038",
+      "properties": {
+        "Name": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "Korean",
+              "text": {
+                "content": "Korean",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "Type": {
+          "type": "select",
+          "select": {
+            "name": "Language"
+          }
+        }
+      },
+      "blocks": []
+    },
+    {
+      "id": "skill-0039",
+      "properties": {
+        "Name": {
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "plain_text": "English",
+              "text": {
+                "content": "English",
+                "link": null
+              },
+              "annotations": {
+                "bold": false,
+                "italic": false,
+                "code": false
+              },
+              "href": null
+            }
+          ]
+        },
+        "Type": {
+          "type": "select",
+          "select": {
+            "name": "Language"
+          }
+        }
+      },
+      "blocks": []
+    }
+  ]
+}

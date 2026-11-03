@@ -1,0 +1,213 @@
+---
+import type { Block } from '../lib/site-schema';
+import RichText from './RichText.astro';
+
+interface Props {
+  blocks: Block[];
+  title: string;
+}
+const { blocks, title } = Astro.props;
+let firstImage = true;
+const isFirstImage = () => {
+  const v = firstImage;
+  firstImage = false;
+  return v;
+};
+---
+
+<div class="blocks">
+  {
+    blocks.map((b) => {
+      switch (b.type) {
+        case 'heading': {
+          const H = (`h${b.level + 1}`) as 'h2' | 'h3' | 'h4';
+          return (
+            <H class="b-heading text">
+              <RichText text={b.text} />
+            </H>
+          );
+        }
+        case 'paragraph':
+          return (
+            <p class="b-text text">
+              <RichText text={b.text} />
+            </p>
+          );
+        case 'quote':
+          return (
+            <blockquote class="b-quote text">
+              <RichText text={b.text} />
+            </blockquote>
+          );
+        case 'list': {
+          const L = b.ordered ? 'ol' : 'ul';
+          return (
+            <L class="b-list text">
+              {b.items.map((item) => (
+                <li>
+                  <RichText text={item} />
+                </li>
+              ))}
+            </L>
+          );
+        }
+        case 'divider':
+          return <hr class="b-divider" />;
+        case 'image': {
+          const first = isFirstImage();
+          return (
+            <figure class="b-media">
+              <img
+                src={b.media.src}
+                width={b.media.width}
+                height={b.media.height}
+                alt={b.caption ? b.caption.map((s) => s.text).join('') : ''}
+                loading={first ? 'eager' : 'lazy'}
+                fetchpriority={first ? 'high' : undefined}
+                decoding="async"
+              />
+              {b.caption && (
+                <figcaption class="mono">
+                  <RichText text={b.caption} />
+                </figcaption>
+              )}
+            </figure>
+          );
+        }
+        case 'video':
+          return (
+            <figure class="b-media">
+              <video src={b.media.src} muted playsinline loop controls preload="metadata" data-inview-play />
+              {b.caption && (
+                <figcaption class="mono">
+                  <RichText text={b.caption} />
+                </figcaption>
+              )}
+            </figure>
+          );
+        case 'embed':
+          return (
+            <figure class={`b-embed b-embed--${b.provider}`}>
+              <iframe
+                src={b.embedUrl}
+                title={`${title} — ${b.provider} embed`}
+                loading="lazy"
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowfullscreen
+                referrerpolicy="strict-origin-when-cross-origin"
+              />
+              <figcaption class="mono">
+                <a href={b.url} target="_blank" rel="noopener">
+                  OPEN ON {b.provider.toUpperCase()} ↗
+                </a>
+              </figcaption>
+            </figure>
+          );
+        case 'fallback-link':
+          return (
+            <p class="b-fallback">
+              <a class="pill" href={b.url} target="_blank" rel="noopener">
+                {b.label} ↗
+              </a>
+            </p>
+          );
+      }
+    })
+  }
+</div>
+
+<script>
+  // Play muted loops only while they are on screen; saves data and battery on phones.
+  const videos = document.querySelectorAll<HTMLVideoElement>('video[data-inview-play]');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const v = e.target as HTMLVideoElement;
+          if (e.isIntersecting) v.play().catch(() => {});
+          else v.pause();
+        }
+      },
+      { threshold: 0.25 },
+    );
+    videos.forEach((v) => {
+      v.muted = true;
+      io.observe(v);
+    });
+  }
+</script>
+
+<style>
+  .blocks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .text {
+    width: 100%;
+    max-width: 680px;
+    margin: 0;
+  }
+  .b-heading {
+    font-family: var(--font-body);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-top: 24px;
+  }
+  .b-quote {
+    padding-left: 16px;
+    border-left: 2px solid var(--ink);
+  }
+  .b-list {
+    padding-left: 1.2em;
+  }
+  .b-divider {
+    width: 100%;
+    max-width: 1200px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 40px 0;
+  }
+  .b-media,
+  .b-embed {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0;
+  }
+  .b-media img,
+  .b-media video {
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-card);
+    background: rgba(0, 0, 0, 0.04);
+  }
+  figcaption {
+    padding-top: 8px;
+    color: var(--muted);
+  }
+  figcaption a {
+    text-decoration: none;
+  }
+  figcaption a:hover {
+    color: var(--ink);
+  }
+  .b-embed iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-card);
+    background: var(--white);
+  }
+  .b-embed--instagram {
+    max-width: 420px;
+  }
+  .b-embed--instagram iframe {
+    aspect-ratio: 9 / 15;
+  }
+  .b-fallback {
+    margin: 0;
+  }
+</style>

@@ -1,0 +1,151 @@
+---
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { loadSite } from '../data/load';
+
+const { experience, skills, contact } = loadSite();
+const groups = [
+  { title: 'TOOLS', items: skills.software, attr: { 'data-tools': '' } },
+  { title: 'EXPERTISE', items: skills.expertise, attr: {} },
+  { title: 'LANGUAGE', items: skills.language, attr: {} },
+];
+---
+
+<Base title="ABOUT — JUWON" description="Experience, tools and contact for JUWON — 3D, AI and graphic designer based in Ilsan, Korea.">
+  <Nav slot="header" current="about" />
+  <main class="about">
+    <h1 class="display title">ABOUT</h1>
+
+    <section class="row">
+      <h2 class="mono label">EXPERIENCE</h2>
+      <ol class="experience" data-experience>
+        {
+          experience.map((e) => (
+            <li class={e.period ? '' : 'no-period'}>
+              {e.period && <span class="mono period">{e.period}</span>}
+              <span class="what">{e.label}</span>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    {
+      groups.map((g) => (
+        <section class="row">
+          <h2 class="mono label">{g.title}</h2>
+          <ul class="pills" {...g.attr}>
+            {g.items.map((t) => (
+              <li class="pill">{t}</li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+
+    <section class="row">
+      <h2 class="mono label">CONTACT</h2>
+      <ul class="contact">
+        {
+          contact.email && (
+            <li>
+              <a href={`mailto:${contact.email}`}>{contact.email}</a>
+            </li>
+          )
+        }
+        {
+          contact.instagram && (
+            <li>
+              <a href={contact.instagram.url} target="_blank" rel="noopener">
+                {contact.instagram.handle} ↗
+              </a>
+            </li>
+          )
+        }
+        {contact.phone && <li>{contact.phone}</li>}
+        {contact.location && <li class="mono muted">{contact.location.toUpperCase()}</li>}
+      </ul>
+    </section>
+  </main>
+  <Footer slot="footer" />
+</Base>
+
+<style>
+  .about {
+    padding: 120px var(--gutter) 64px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .title {
+    font-size: clamp(48px, 12vw, 200px);
+    margin: 0 0 clamp(48px, 8vw, 96px) -0.04em;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 28px 0;
+    border-top: 1px solid var(--line);
+  }
+  .label {
+    margin: 0;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  ol,
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .experience li {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 16px;
+    padding: 6px 0;
+  }
+  .experience li.no-period .what {
+    grid-column: 1 / -1;
+  }
+  .period {
+    color: var(--muted);
+    padding-top: 0.35em;
+  }
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pills .pill {
+    cursor: default;
+    text-transform: none;
+  }
+  .pills .pill:hover {
+    background: var(--white);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .contact {
+    display: grid;
+    gap: 6px;
+    font-size: clamp(20px, 3vw, 32px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .contact a {
+    text-decoration: none;
+  }
+  .contact a:hover {
+    text-decoration: underline;
+  }
+  .muted {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  @media (min-width: 768px) {
+    .row {
+      grid-template-columns: 240px 1fr;
+    }
+  }
+</style>

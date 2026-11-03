@@ -1,0 +1,50 @@
+---
+import Base from '../../layouts/Base.astro';
+import Nav from '../../components/Nav.astro';
+import WorkStack from '../../components/WorkStack.astro';
+import { loadSite } from '../../data/load';
+
+const { works } = loadSite();
+---
+
+<Base title="WORKS — JUWON" description="Selected 3D, AI-generated and graphic work by JUWON.">
+  <Nav slot="header" current="works" />
+  <main class="works-page">
+    <div class="title">
+      <h1 class="display">WORKS</h1>
+      <span class="mono count" data-count aria-label={`${works.length} works`}>{String(works.length).padStart(2, '0')}</span>
+    </div>
+    <WorkStack works={works} />
+  </main>
+</Base>
+
+<style>
+  .works-page {
+    position: relative;
+    min-height: 100svh;
+    padding: 96px var(--gutter) var(--gutter);
+    overflow: hidden;
+  }
+  .title {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 0 32px;
+  }
+  .title h1 {
+    font-size: clamp(48px, 12vw, 200px);
+    margin-left: -0.04em;
+  }
+  .count {
+    padding-top: 0.4em;
+  }
+  @media (min-width: 768px) {
+    .title {
+      position: absolute;
+      left: var(--gutter);
+      bottom: var(--gutter);
+      margin: 0;
+      z-index: 0;
+    }
+  }
+</style>

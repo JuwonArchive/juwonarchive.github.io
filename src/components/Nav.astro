@@ -1,0 +1,45 @@
+---
+import { loadSite } from '../data/load';
+
+interface Props {
+  current?: 'works' | 'about';
+}
+const { current } = Astro.props;
+const { contact } = loadSite();
+---
+
+<header class="nav">
+  <a class="brand mono" href="/">JUWON</a>
+  <nav aria-label="Main">
+    <a class="pill" href="/works" aria-current={current === 'works' ? 'page' : undefined}>WORKS</a>
+    <a class="pill" href="/about" aria-current={current === 'about' ? 'page' : undefined}>ABOUT</a>
+    {contact.email && <a class="pill" href={`mailto:${contact.email}`}>CONTACT</a>}
+  </nav>
+</header>
+
+<style>
+  .nav {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: var(--gutter);
+    pointer-events: none;
+  }
+  .nav > * {
+    pointer-events: auto;
+  }
+  .brand {
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    letter-spacing: 0.08em;
+  }
+  nav {
+    display: flex;
+    gap: 6px;
+  }
+</style>

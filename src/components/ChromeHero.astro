@@ -1,0 +1,50 @@
+---
+/** Floating chrome object. Falls back to a still render when WebGL is unavailable. */
+---
+
+<div class="chrome" data-chrome>
+  <canvas id="chrome-hero"></canvas>
+  <img class="fallback" src="/chrome-fallback.webp" alt="" width="900" height="900" hidden />
+  <noscript><img class="fallback" src="/chrome-fallback.webp" alt="" width="900" height="900" /></noscript>
+</div>
+
+<script>
+  import { mountChromeHero } from '../scripts/chrome-hero';
+
+  const canvas = document.querySelector<HTMLCanvasElement>('#chrome-hero');
+  const fallback = document.querySelector<HTMLImageElement>('[data-chrome] img.fallback');
+  if (canvas) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const hero = mountChromeHero(canvas, { reducedMotion });
+    if (!hero) {
+      canvas.remove();
+      fallback?.removeAttribute('hidden');
+    } else {
+      canvas.dataset.reflection = '';
+      canvas.toggleAttribute('data-ready', true);
+      for (const item of document.querySelectorAll<HTMLElement>('[data-category-item]')) {
+        item.addEventListener('pointerenter', () => hero.setReflection(item.dataset.cover || null));
+        item.addEventListener('focus', () => hero.setReflection(item.dataset.cover || null));
+        item.addEventListener('pointerleave', () => hero.setReflection(null));
+        item.addEventListener('blur', () => hero.setReflection(null));
+      }
+    }
+  }
+</script>
+
+<style>
+  .chrome {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+  }
+  .fallback {
+    width: min(62vmin, 640px);
+    height: auto;
+  }
+</style>

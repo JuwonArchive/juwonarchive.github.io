@@ -1,0 +1,151 @@
+---
+import type { Work } from '../lib/site-schema';
+import { config } from '../config';
+import { longestWord } from '../lib/fit';
+
+interface Props {
+  works: Work[];
+}
+const { works } = Astro.props;
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<div class="stack" data-stack style={`--n:${works.length}`}>
+  {
+    works.map((w, i) => (
+      <a
+        class="work-card"
+        href={`/works/${w.slug}`}
+        data-index={i}
+        data-active={i === 0 ? '' : undefined}
+        style={`--i:${i};--tint:${config.pastels[i % config.pastels.length]}`}
+      >
+        <span class="frame">
+          {w.cover ? (
+            <img
+              src={w.cover.src}
+              width={w.cover.width}
+              height={w.cover.height}
+              alt=""
+              loading={i < 2 ? 'eager' : 'lazy'}
+              decoding="async"
+            />
+          ) : (
+            <span class="placeholder display fit" style={`--chars:${longestWord(w.titleEn)}`}>
+              {w.titleEn}
+            </span>
+          )}
+        </span>
+        <span class="caption">
+          <span class="mono num">{pad(i + 1)}</span>
+          <span class="mono" data-card-title>
+            {w.titleEn}
+          </span>
+        </span>
+      </a>
+    ))
+  }
+</div>
+
+<p class="hint mono" aria-hidden="true">SCROLL OR USE ← → TO BROWSE · CLICK TO OPEN</p>
+
+<script>
+  import { mountWorkStack } from '../scripts/work-stack';
+  const el = document.querySelector<HTMLElement>('[data-stack]');
+  if (el) mountWorkStack(el);
+</script>
+
+<style>
+  .stack {
+    position: relative;
+  }
+  .work-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+  .frame {
+    display: block;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: var(--tint);
+  }
+  .frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .placeholder {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: 12%;
+    text-align: center;
+    --fit-max: 64px;
+    --fit-width: (var(--card-w, 80vw) * 0.76);
+  }
+  .caption {
+    display: flex;
+    gap: 12px;
+    padding-top: 10px;
+  }
+  .num {
+    color: var(--muted);
+  }
+  .hint {
+    display: none;
+  }
+
+  /* Phones: a plain vertical list. */
+  @media (max-width: 767px) {
+    .stack {
+      display: grid;
+      gap: 40px;
+    }
+  }
+
+  /* Desktop: diagonal 3D stack (UNVEIL-style). */
+  @media (min-width: 768px) {
+    .stack {
+      --card-w: min(26vw, 400px, (100svh - 260px) * 0.8);
+      height: calc(100svh - 160px);
+      min-height: 560px;
+      perspective: 1600px;
+      perspective-origin: 30% 40%;
+      transform-style: preserve-3d;
+    }
+    .work-card {
+      --d: calc(var(--i) - var(--active, 0));
+      position: absolute;
+      left: 42%;
+      top: 4%;
+      width: var(--card-w);
+      transform-origin: left center;
+      transform: translate3d(calc(var(--d) * 6vw), calc(var(--d) * -5vh), calc(var(--d) * -160px)) rotateY(-32deg);
+      transition:
+        transform 600ms var(--ease),
+        opacity 600ms var(--ease);
+      z-index: calc(var(--n) - var(--i));
+    }
+    .work-card[data-active] {
+      transform: translate3d(0, 0, 0) rotateY(0deg);
+    }
+    .work-card[data-past] {
+      transform: translate3d(-30vw, 6vh, 0) rotateY(-32deg);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .work-card:not([data-active]) .caption {
+      opacity: 0;
+    }
+    .hint {
+      display: block;
+      position: absolute;
+      right: var(--gutter);
+      bottom: var(--gutter);
+      margin: 0;
+      color: var(--muted);
+    }
+  }
+</style>
