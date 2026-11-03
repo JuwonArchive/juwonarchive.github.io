@@ -1,16 +1,18 @@
 /**
  * Halftone artwork. A fixed set of dots morphs between forms:
- *   ribbon — a twisted band (bigger dots where it faces the viewer)
- *   cloud  — a halftone cloud with concentric ripples inside and dotted rings on both sides
- *   ripple — a tilted disc of concentric dotted rings
+ *   fold — a sheet folded by crossing waves
+ *   vortex — a spiral funnel
+ *   torus — a breathing, twisting torus
+ *   bloom — radial petals rising and falling
+ * Dots are bigger where the surface faces the viewer.
  * Shared 3D rotation follows the pointer. Dots are capped so they never touch each other.
- * Reduced motion: the ribbon, drawn once.
+ * Reduced motion: the first form, drawn once.
  */
 type Opts = { color: string; pitch: number; reducedMotion: boolean; avoid?: () => Element | null };
 type P = { x: number; y: number; z: number; nx: number; ny: number; nz: number; w: number };
 
 const N = 1600;
-const FORMS = ['ribbon', 'cloud', 'ripple'] as const;
+const FORMS = ['fold', 'vortex', 'torus', 'bloom'] as const;
 type Form = (typeof FORMS)[number];
 const HOLD = 6; // seconds a form stays
 const MORPH = 2.5; // seconds to flow into the next
@@ -24,95 +26,92 @@ const ordered = (pts: P[]) => {
   return pts.sort((a, b) => a.x + a.y * 0.6 - (b.x + b.y * 0.6));
 };
 
-function ribbon(t: number): P[] {
-  const NU = 80;
-  const NV = 20;
+/** Push a parametric surface sampled on a NU×NV grid; normal from finite differences. */
+function surface(NU: number, NV: number, f: (u: number, v: number) => [number, number, number], weight: (u: number, v: number) => number): P[] {
   const pts: P[] = [];
-  for (let i = 0; i < NU; i++) {
-    const u = i / (NU - 1);
-    const s = u - 0.5;
-    const C = [s * 2.4, 0.42 * Math.sin(s * Math.PI * 1.3), 0.3 * Math.cos(s * Math.PI)];
-    const twist = s * Math.PI * 2.2 + t * 0.35;
-    const width = 0.18 + 0.66 * Math.pow(Math.abs(s) * 2, 1.15);
-    const [ct, st] = [Math.cos(twist), Math.sin(twist)];
-    const ends = Math.pow(Math.sin(Math.PI * u), 0.55);
+  const e = 1e-3;
+  for (let i = 0; i < NU; i++)
     for (let j = 0; j < NV; j++) {
-      const v = (j / (NV - 1)) * 2 - 1;
-      pts.push({ x: C[0], y: C[1] + v * width * ct, z: C[2] + v * width * st, nx: 0, ny: -st, nz: ct, w: ends * (1 - Math.pow(Math.abs(v), 3)) });
-    }
-  }
-  return ordered(pts);
-}
-
-function cloud(t: number): P[] {
-  const pts: P[] = [];
-  // Dotted rings on both sides.
-  for (const [cx, cy, R] of [
-    [-1.05, 0.05, 0.42],
-    [1.0, 0.0, 0.38],
-  ]) {
-    for (let k = 1; k <= 5; k++) {
-      const r = (R * k) / 5;
-      const count = Math.round(14 + k * 9);
-      for (let a = 0; a < count; a++) {
-        const th = (a / count) * Math.PI * 2 + t * 0.15 * (k % 2 ? 1 : -1);
-        pts.push({ x: cx + Math.cos(th) * r, y: cy + Math.sin(th) * r, z: 0, nx: 0, ny: 0, nz: 1, w: 0.35 + 0.25 * (1 - k / 6) });
-      }
-    }
-  }
-  // Halftone body: grid inside a lumpy blob, concentric ripples modulating dot size.
-  const G = Math.ceil(Math.sqrt((N - pts.length) / 0.72));
-  for (let gy = 0; gy < G && pts.length < N; gy++)
-    for (let gx = 0; gx < G && pts.length < N; gx++) {
-      const x = (gx / (G - 1)) * 2 - 1;
-      const y = (gy / (G - 1)) * 2 - 1;
-      const ang = Math.atan2(y, x);
-      const edge = 0.82 + 0.16 * Math.sin(ang * 3 + 1) + 0.08 * Math.sin(ang * 5 + t * 0.2);
-      const d = Math.hypot(x * 1.15, y);
-      if (d > edge) continue;
-      const wave = 0.5 + 0.5 * Math.cos(Math.hypot(x + 0.15, y) * 14 - t * 1.6);
-      const fade = 1 - Math.pow(d / edge, 3);
-      pts.push({ x: x * 1.0, y: y * 0.78, z: 0.12 * Math.sin(x * 3 + t * 0.4), nx: 0, ny: 0, nz: 1, w: fade * (0.4 + 0.6 * wave) });
+      const u = i / (NU - 1);
+      const v = j / (NV - 1);
+      const p = f(u, v);
+      const pu = f(u + e, v);
+      const pv = f(u, v + e);
+      const a = [pu[0] - p[0], pu[1] - p[1], pu[2] - p[2]];
+      const b = [pv[0] - p[0], pv[1] - p[1], pv[2] - p[2]];
+      let n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      const l = Math.hypot(n[0], n[1], n[2]) || 1;
+      n = n.map((c) => c / l);
+      pts.push({ x: p[0], y: p[1], z: p[2], nx: n[0], ny: n[1], nz: n[2], w: weight(u, v) });
     }
   return ordered(pts);
 }
 
-function ripple(t: number): P[] {
-  const pts: P[] = [];
-  const RINGS = 16;
-  const tilt = 0.62;
-  for (let k = 1; k <= RINGS && pts.length < N; k++) {
-    const r = (k / RINGS) * 1.15;
-    const count = Math.round(6 + k * 5.2);
-    const wave = 0.5 + 0.5 * Math.cos(r * 11 - t * 1.8);
-    for (let a = 0; a < count; a++) {
-      const th = (a / count) * Math.PI * 2;
-      const x = Math.cos(th) * r;
-      const y0 = Math.sin(th) * r;
-      const z0 = 0.1 * wave;
-      // The disc lies in a tilted plane so it reads as seen from above.
-      pts.push({
-        x,
-        y: y0 * Math.cos(tilt) - z0 * Math.sin(tilt),
-        z: y0 * Math.sin(tilt) + z0 * Math.cos(tilt),
-        nx: 0,
-        ny: -Math.sin(tilt),
-        nz: Math.cos(tilt),
-        w: (1 - Math.pow(k / RINGS, 2.6)) * (0.45 + 0.55 * wave),
-      });
-    }
-  }
-  return ordered(pts);
-}
+const soft = (x: number) => Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, x))), 0.6);
 
-const BUILD: Record<Form, (t: number) => P[]> = { ribbon, cloud, ripple };
+/** A sheet folded by crossing waves, drifting like cloth. */
+const fold = (t: number) =>
+  surface(
+    50,
+    32,
+    (u, v) => {
+      const x = (u - 0.5) * 2.2;
+      const y = (v - 0.5) * 1.25;
+      return [x, y, 0.32 * Math.sin(x * 2.1 + t * 0.6) + 0.22 * Math.cos(y * 3.2 - x * 1.1 + t * 0.45)];
+    },
+    (u, v) => soft(u) * soft(v),
+  );
+
+/** A spiral funnel turning slowly. */
+const vortex = (t: number) =>
+  surface(
+    64,
+    25,
+    (u, v) => {
+      const r = 0.12 + v * 1.1;
+      const a = u * Math.PI * 2 + v * 2.4 + t * 0.35;
+      return [Math.cos(a) * r, Math.sin(a) * r * 0.9, 0.9 * Math.pow(1 - v, 2) - 0.35];
+    },
+    (_, v) => soft(v * 0.92 + 0.04) * (0.4 + 0.6 * v),
+  );
+
+/** A torus whose tube breathes and twists. */
+const torus = (t: number) =>
+  surface(
+    64,
+    25,
+    (u, v) => {
+      const a = u * Math.PI * 2;
+      const b = v * Math.PI * 2 + a * 1.5 + t * 0.4;
+      const R = 0.85;
+      const r = 0.34 + 0.08 * Math.sin(a * 3 + t * 0.8);
+      return [(R + r * Math.cos(b)) * Math.cos(a), (R + r * Math.cos(b)) * Math.sin(a) * 0.95, r * Math.sin(b)];
+    },
+    () => 0.85,
+  );
+
+/** A radial bloom: petals rising and falling around a centre. */
+const bloom = (t: number) =>
+  surface(
+    64,
+    25,
+    (u, v) => {
+      const a = u * Math.PI * 2;
+      const petals = 0.75 + 0.25 * Math.cos(a * 5 + t * 0.5);
+      const r = v * 1.15 * petals;
+      return [Math.cos(a) * r, Math.sin(a) * r, 0.45 * Math.sin(v * Math.PI) * Math.cos(a * 5 + t * 0.5) - 0.1];
+    },
+    (_, v) => soft(v * 0.95 + 0.05) * (0.6 + 0.4 * v),
+  );
+
+const BUILD: Record<Form, (t: number) => P[]> = { fold, vortex, torus, bloom };
 const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   canvas.dataset.forms = FORMS.join(',');
-  canvas.dataset.form = 'ribbon';
+  canvas.dataset.form = FORMS[0];
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   let w = 0;
   let h = 0;
@@ -197,12 +196,12 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
 
     const mobile = w < 768;
     const cx = mobile ? w * 0.5 : w * 0.55;
-    const cy = mobile ? h * 0.58 : h * 0.6;
-    const size = mobile ? w * 0.48 : Math.min(w * 0.42, h * 0.7);
+    const cy = mobile ? h * 0.4 : h * 0.42;
+    const size = mobile ? w * 0.44 : Math.min(w * 0.36, h * 0.5);
     const maxR = Math.min(opts.pitch * 0.66, size * 0.028);
     const yaw = pose.yaw + Math.sin(t * 0.15) * 0.25;
     const pitch = pose.pitch + 0.3;
-    const roll = 0.32;
+    const roll = 0.2;
     const [cyw, syw, cp, sp, cr, srl] = [Math.cos(yaw), Math.sin(yaw), Math.cos(pitch), Math.sin(pitch), Math.cos(roll), Math.sin(roll)];
 
     for (let i = 0; i < N; i++) {

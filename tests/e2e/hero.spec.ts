@@ -17,12 +17,19 @@ async function inkAround(page: Page, x: number, y: number, half = 40) {
 }
 
 test.describe('home graphics', () => {
-  test('orbit diagram is gone; JUWON sits at the top', async ({ page }) => {
+  test('JUWON sits at the bottom; a small clock holds the top-right corner', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await expect(page.locator('[data-orbit]')).toHaveCount(0);
-    const top = (await page.locator('h1').boundingBox())!.y;
-    expect(top).toBeLessThan(page.viewportSize()!.height * 0.25);
+    const vp = page.viewportSize()!;
+    const h1 = (await page.locator('h1').boundingBox())!;
+    expect(h1.y + h1.height).toBeGreaterThan(vp.height * 0.7);
+    const clock = page.locator('[data-visit-clock]');
+    await expect(clock).toHaveText(/\d{2}:\d{2}:\d{2}/);
+    const c = (await clock.boundingBox())!;
+    expect(c.x + c.width).toBeGreaterThan(vp.width * 0.8);
+    expect(c.y).toBeLessThan(vp.height * 0.12);
+    await expect(page.locator('[data-corner-label]')).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -32,7 +39,7 @@ test.describe('home graphics', () => {
     const canvas = page.locator('canvas[data-halftone]');
     await expect(canvas).toBeVisible();
     await expect(canvas).toHaveAttribute('data-color', '#dae0e5');
-    await expect(canvas).toHaveAttribute('data-form', 'ribbon');
+    await expect(canvas).toHaveAttribute('data-form', 'fold');
     // Coverage: some cells are dense, most of the page stays open.
     const share = await canvas.evaluate((c: HTMLCanvasElement) => {
       const ctx = c.getContext('2d')!;
@@ -81,7 +88,8 @@ test.describe('home graphics', () => {
     await page.goto('/');
     const canvas = page.locator('canvas[data-halftone]');
     const forms = (await canvas.getAttribute('data-forms'))!.split(',');
-    expect(forms).toEqual(expect.arrayContaining(['ribbon', 'cloud', 'ripple']));
+    expect(forms.length).toBeGreaterThanOrEqual(4);
+    expect(forms).toEqual(expect.arrayContaining(['fold', 'vortex', 'torus', 'bloom'])); // original forms
     const seen = new Set<string>();
     for (let i = 0; i < 22 && seen.size < 2; i++) {
       seen.add((await canvas.getAttribute('data-form'))!);

@@ -3,10 +3,10 @@
   /* Cool, experimental palette: blue-leaning greys, no warm tones. */
   --lavender: #e9ecf6;
   --mint: #e7eef6;
-  --ink: #1d2430;
+  --ink: #111111;
   --muted: #7b8794;
   --line: #dce2e8;
-  --display: #dae0e5;
+  --display: #111111;
   --white: #ffffff;
 
   --font-display: 'Archivo Variable', 'Arial Black', system-ui, sans-serif;

@@ -40,13 +40,9 @@ test('page background is pure white', async ({ page }) => {
   }
 });
 
-test('cool mood: display text in pale #DAE0E5, body text in cool slate (not black)', async ({ page }) => {
+test('main text is black again (user)', async ({ page }) => {
   for (const path of ['/', '/archive', '/info']) {
     await page.goto(path);
-    expect(await page.locator('h1').evaluate((el) => getComputedStyle(el).color)).toBe('rgb(218, 224, 229)');
-    const ink = await page.evaluate(() => getComputedStyle(document.body).color);
-    const [r, g, b] = ink.match(/\d+/g)!.map(Number);
-    expect(b).toBeGreaterThan(r); // blue-leaning, cold
-    expect(r + g + b).toBeGreaterThan(30); // not pure black
+    expect(await page.locator('h1').evaluate((el) => getComputedStyle(el).color)).toBe('rgb(17, 17, 17)');
   }
 });

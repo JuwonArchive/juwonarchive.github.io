@@ -9,8 +9,8 @@ colors:
   tint-frost: "#E7EEF6"
   tint-mist: "#EAF1F4"
   tint-steel: "#E9ECF6"
-  display: "#DAE0E5"
-  ink: "#1D2430"
+  display: "#111111"
+  ink: "#111111"
   muted: "#7B8794"
   hairline: "#DCE2E8"
   signal-white: "#F0FAFF"
@@ -172,6 +172,6 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 
 ## Mood update (2026-11-03): cold & experimental
 
-- Display words (JUWON, ARCHIVE, INFO, work titles) use **Display `#DAE0E5`**, a pale cool grey. Small text stays readable in **Ink `#1D2430`** (blue-black) and **Muted `#7B8794`**.
+- Display words and small text are **Ink `#111111`** (black, user decision); Muted `#7B8794` for secondary labels.
 - Tints are icy (ice, frost, mist, steel). No warm tones anywhere.
-- Home artwork: a single twisted halftone ribbon in Display `#DAE0E5` on plain white, with faint dotted arcs in two corners. No background colour or fog.
+- Home: JUWON at the bottom; a small mono top bar (label left, visitor's local time right). Behind, a halftone artwork in `#DAE0E5` morphs through four original forms (fold, vortex, torus, bloom) and turns toward the pointer. Plain white, no fog.

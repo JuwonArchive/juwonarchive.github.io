@@ -13,6 +13,13 @@ const site = loadSite();
   <main class="home">
     <Intro site={site} />
     <div class="hero-slot" aria-hidden="true"><Halftone /></div>
+    <header class="top mono">
+      <span data-corner-label>JUWON — PORTFOLIO ARCHIVE '26</span>
+      <span class="clock">
+        LOCAL <time data-visit-clock>--:--:--</time>
+      </span>
+    </header>
+    <div class="spacer"></div>
     <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`} aria-label={config.headline}>
       {[...config.headline].map((ch, i) => <span class="l" style={`--i:${i}`} aria-hidden="true">{ch}</span>)}
     </h1>
@@ -26,6 +33,21 @@ const site = loadSite();
   </main>
 </Base>
 
+<script>
+  // Visitor's local time, ticking each second.
+  const el = document.querySelector<HTMLTimeElement>('[data-visit-clock]');
+  if (el) {
+    const fmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const tick = () => {
+      const now = new Date();
+      el.textContent = fmt.format(now);
+      el.dateTime = now.toISOString();
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+</script>
+
 <style>
   .home {
     position: relative;
@@ -33,7 +55,7 @@ const site = loadSite();
     min-height: 480px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: var(--gutter);
     overflow: hidden;
   }
@@ -44,11 +66,25 @@ const site = loadSite();
     z-index: 1;
     pointer-events: none;
   }
-  /* JUWON sits at the top (user request). */
+  /* Small top bar: label left, visitor's local time right — holds the page's structure. */
+  .top {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+  }
+  .top time {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .spacer {
+    flex: 1;
+  }
   .headline {
     position: relative;
     z-index: 2;
-    margin-top: clamp(8px, 2vw, 24px);
     pointer-events: none;
     /* JUWON's W and O are wider than average, so budget ~0.98em per glyph. */
     --fit-max: 360px;
