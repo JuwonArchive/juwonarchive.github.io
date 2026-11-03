@@ -7,38 +7,40 @@ interface Props {
   tint: string;
 }
 const { work, index, tint } = Astro.props;
+const num = String(index + 1).padStart(2, '0');
 ---
 
 <a class="box" href={`/archive/${work.slug}`} data-archive-box style={`--tint:${tint}`}>
   <span class="scene" aria-hidden="true">
     <span class="cube">
-      <span class="face floor"></span>
-      <span class="face lid"></span>
-      <span class="face side"></span>
-      <span class="face front">
+      <span class="glow"></span>
+      <span class="f back"></span>
+      <span class="f left"></span>
+      <span class="card">
         {
           work.cover ? (
             <img src={work.cover.src} width={work.cover.width} height={work.cover.height} alt="" loading="lazy" decoding="async" />
           ) : (
-            <span class="mono face-title" data-box-face-title>
+            <span class="mono card-title" data-box-face-title>
               {work.titleEn}
             </span>
           )
         }
-        <span class="tab mono">{String(index + 1).padStart(2, '0')}</span>
       </span>
+      <span class="f lid"></span>
+      <span class="f side"></span>
+      <span class="f front"><span class="etch mono">JUWON ARCHIVE — {num}</span></span>
     </span>
   </span>
   <span class="label mono">
-    <span class="num">{String(index + 1).padStart(2, '0')}</span>
+    <span class="num">{num}</span>
     <span data-box-name>{work.titleEn}</span>
   </span>
 </a>
 
 <style>
-  /* An archive storage box in CSS 3D: chrome lid and side, the work's cover on the front. */
+  /* Theme B — frosted acrylic box: the work floats inside, the floor glows in the work's tint. */
   .box {
-    --w: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -51,103 +53,129 @@ const { work, index, tint } = Astro.props;
     display: block;
     width: 100%;
     aspect-ratio: 5 / 4;
-    perspective: 900px;
+    perspective: 1000px;
     container-type: inline-size;
   }
   /* Every face starts at the cube centre and is pushed out by half the cube's size. */
   .cube {
-    --W: 66cqw;
-    --H: 54cqw;
-    --D: 34cqw;
+    --W: 70cqw;
+    --H: 50cqw;
+    --D: 46cqw;
     position: relative;
     display: block;
     width: 100%;
     height: 100%;
     transform-style: preserve-3d;
     transform: rotateX(-16deg) rotateY(-30deg);
-    transition: transform 600ms var(--ease);
+    transition: transform 700ms var(--ease);
   }
-  .face {
+  .f,
+  .card,
+  .glow {
     position: absolute;
     left: 50%;
     top: 50%;
     display: block;
-    backface-visibility: hidden;
+  }
+  .f {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18) 45%, rgba(255, 255, 255, 0.4));
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.6);
   }
   .front {
     width: var(--W);
     height: var(--H);
-    overflow: hidden;
-    border-radius: 2px;
-    background: var(--tint);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
     transform: translate(-50%, -50%) translateZ(calc(var(--D) / 2));
   }
-  .front img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .face-title {
-    display: grid;
-    place-items: center;
-    height: 100%;
-    padding: 12px;
-    text-align: center;
-  }
-  .tab {
-    position: absolute;
-    left: 50%;
-    bottom: 8%;
-    transform: translateX(-50%);
-    padding: 2px 8px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.92);
-    color: var(--ink);
+  .back {
+    width: var(--W);
+    height: var(--H);
+    transform: translate(-50%, -50%) translateZ(calc(var(--D) / -2));
   }
   .side {
     width: var(--D);
     height: var(--H);
     transform: translate(-50%, -50%) rotateY(90deg) translateZ(calc(var(--W) / 2));
-    background: linear-gradient(180deg, #fdfdfd 0%, #b6b9bf 30%, #eef0f2 50%, #8a8d93 78%, #cfd2d6 100%);
+  }
+  .left {
+    width: var(--D);
+    height: var(--H);
+    transform: translate(-50%, -50%) rotateY(-90deg) translateZ(calc(var(--W) / 2));
   }
   .lid {
     width: var(--W);
     height: var(--D);
     transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2));
-    background: linear-gradient(100deg, #ffffff 0%, #c9ccd1 30%, #f8f9fa 52%, #9ea1a7 80%, #e8eaed 100%);
+    transition:
+      transform 600ms var(--ease),
+      opacity 400ms ease;
+  }
+  .glow {
+    width: calc(var(--W) * 1.3);
+    height: calc(var(--D) * 1.3);
+    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / -2 - 1px));
+    background: radial-gradient(closest-side, var(--tint), transparent);
+    filter: blur(4px);
+  }
+  .card {
+    width: calc(var(--W) * 0.72);
+    height: calc(var(--H) * 0.78);
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--tint);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    transform: translate(-50%, -50%) translateZ(2px);
     transition: transform 600ms var(--ease);
   }
-  .floor {
-    width: var(--W);
-    height: var(--D);
-    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / -2 + 1px));
-    background: radial-gradient(circle at 50% 50%, #3a3c40, #151618 75%);
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
-  /* Opening: the lid flies off and the view drops into the box. */
-  .box[data-opening] .cube {
-    transition: transform 900ms cubic-bezier(0.6, 0, 0.2, 1);
-    transform: rotateX(-82deg) rotateY(0deg) scale(3.2);
+  .card-title {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: 10px;
+    text-align: center;
   }
+  .etch {
+    position: absolute;
+    left: 8%;
+    bottom: 6%;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    color: rgba(17, 17, 17, 0.55);
+  }
+
+  /* Hover: the lid lifts and the work rises out of the box. */
+  .box:not([data-opening]):hover .cube,
+  .box:not([data-opening]):focus-visible .cube {
+    transform: rotateX(-12deg) rotateY(-20deg) translateY(-4px);
+  }
+  .box:not([data-opening]):hover .lid,
+  .box:not([data-opening]):focus-visible .lid {
+    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2 + 14px));
+  }
+  .box:not([data-opening]):hover .card,
+  .box:not([data-opening]):focus-visible .card {
+    transform: translate(-50%, -64%) translateZ(2px);
+  }
+
+  /* Opening: the lid flies off and the view dives through the acrylic toward the work. */
   .box[data-opening] .lid {
-    transition:
-      transform 500ms var(--ease),
-      opacity 400ms ease 150ms;
     transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2 + 70cqw)) rotateY(25deg);
     opacity: 0;
+  }
+  .box[data-opening] .cube {
+    transition: transform 900ms cubic-bezier(0.6, 0, 0.2, 1);
+    transform: rotateX(0deg) rotateY(0deg) translateZ(320px) scale(1.6);
   }
   .box[data-opening] .label {
     opacity: 0;
     transition: opacity 200ms;
   }
-  .box:not([data-opening]):hover .cube,
-  .box:not([data-opening]):focus-visible .cube {
-    transform: rotateX(-12deg) rotateY(-18deg) translateY(-6px);
-  }
-  .box:not([data-opening]):hover .lid,
-  .box:not([data-opening]):focus-visible .lid {
-    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2 + 12px));
-  }
+
   .label {
     display: flex;
     gap: 10px;
