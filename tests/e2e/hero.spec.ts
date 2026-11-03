@@ -26,42 +26,58 @@ test.describe('home graphics', () => {
     expect(errors).toEqual([]);
   });
 
-  test('a dense halftone in the display colour fills the space', async ({ page }) => {
+  test('a halftone ribbon artwork in the display colour, not a wallpaper', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const canvas = page.locator('canvas[data-halftone]');
     await expect(canvas).toBeVisible();
-    const box = (await canvas.boundingBox())!;
-    const vp = page.viewportSize()!;
-    expect(box.width * box.height).toBeGreaterThan(vp.width * vp.height * 0.5);
-    expect(Number(await canvas.getAttribute('data-pitch'))).toBeLessThanOrEqual(16);
     await expect(canvas).toHaveAttribute('data-color', '#dae0e5');
-    // Something is actually drawn across the canvas.
-    expect(await inkAround(page, box.x + box.width / 2, box.y + box.height / 2, 120)).toBeGreaterThan(20);
+    await expect(canvas).toHaveAttribute('data-form', 'ribbon');
+    // Coverage: some cells are dense, most of the page stays open.
+    const share = await canvas.evaluate((c: HTMLCanvasElement) => {
+      const ctx = c.getContext('2d')!;
+      const cell = Math.round(60 * (c.width / c.clientWidth));
+      let inked = 0;
+      let dense = 0;
+      let total = 0;
+      for (let y = 0; y + cell <= c.height; y += cell)
+        for (let x = 0; x + cell <= c.width; x += cell) {
+          const d = ctx.getImageData(x, y, cell, cell).data;
+          let a = 0;
+          for (let i = 3; i < d.length; i += 4) a += d[i];
+          const mean = a / (d.length / 4);
+          total++;
+          if (mean > 8) inked++;
+          if (mean > 60) dense++;
+        }
+      return { inked: inked / total, dense: dense / total };
+    });
+    expect(share.inked).toBeGreaterThan(0.08);
+    expect(share.inked).toBeLessThan(0.55);
+    expect(share.dense).toBeGreaterThan(0.02);
   });
 
   test('the field clears behind JUWON so the name reads', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const h1 = (await page.locator('h1').boundingBox())!;
-    const behind = await inkAround(page, h1.x + h1.width / 2, h1.y + h1.height / 2, 30);
-    const open = await inkAround(page, h1.x + h1.width / 2, h1.y + h1.height + 200, 30);
-    expect(behind).toBeLessThan(open * 0.15);
+    for (const fx of [0.2, 0.5, 0.8]) {
+      expect(await inkAround(page, h1.x + h1.width * fx, h1.y + h1.height / 2, 30)).toBeLessThan(3);
+    }
   });
 
-  test('dots swell around the pointer', async ({ page, isMobile }) => {
+  test('the ribbon turns toward the pointer', async ({ page, isMobile }) => {
     test.skip(isMobile, 'pointer');
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
-    const box = (await page.locator('canvas[data-halftone]').boundingBox())!;
-    const x = box.x + box.width * 0.75;
-    const y = box.y + box.height * 0.6;
-    await page.mouse.move(5, 5);
-    await page.waitForTimeout(400);
-    const before = await inkAround(page, x, y);
-    await page.mouse.move(x, y, { steps: 8 });
-    await page.waitForTimeout(700);
-    const after = await inkAround(page, x, y);
-    expect(after).toBeGreaterThan(before * 1.25);
+    const snap = () => page.locator('canvas[data-halftone]').evaluate((c: HTMLCanvasElement) => c.dataset.pose);
+    await page.mouse.move(40, 40, { steps: 4 });
+    await page.waitForTimeout(900);
+    const a = await snap();
+    await page.mouse.move(1300, 800, { steps: 8 });
+    await page.waitForTimeout(900);
+    const b = await snap();
+    expect(a).toBeTruthy();
+    expect(b).not.toBe(a);
   });
 
   test('fog of the four palette colours drifts and follows the pointer', async ({ page, isMobile }) => {
