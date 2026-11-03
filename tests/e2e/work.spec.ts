@@ -168,7 +168,7 @@ test.describe('resolution and sources', () => {
 
 
 test.describe('tall images', () => {
-  const tallWork = site.works.find((w) => w.blocks.some((b) => b.type === 'image' && b.media.height! > b.media.width! * 2));
+  const tallWork = site.works.find((w) => w.blocks.some((b) => b.type === 'image' && !!b.media && b.media.height! > b.media.width! * 2));
   test('show their top at a readable width and open full size on click', async ({ page }) => {
     test.skip(!tallWork, 'no tall images');
     await page.goto(`/works/${tallWork!.slug}`);
