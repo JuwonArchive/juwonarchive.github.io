@@ -8,7 +8,7 @@
  * Shared 3D rotation follows the pointer. Dots are capped so they never touch each other.
  * Reduced motion: the first form, drawn once.
  */
-type Opts = { color: string; pitch: number; reducedMotion: boolean; avoid?: () => Element | null };
+type Opts = { color: string; pitch: number; reducedMotion: boolean; avoid?: () => Element | null; trace?: HTMLCanvasElement | null; traceColor?: string };
 type P = { x: number; y: number; z: number; nx: number; ny: number; nz: number; w: number };
 
 const N = 1600;
@@ -132,12 +132,85 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
     return d >= FADE ? 1 : d / FADE;
   };
 
+  const tctx = opts.trace?.getContext('2d') ?? null;
+
   const resize = () => {
     w = canvas.clientWidth;
     h = canvas.clientHeight;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
+    if (opts.trace) {
+      opts.trace.width = canvas.width;
+      opts.trace.height = canvas.height;
+    }
     measureClear();
+  };
+
+  /**
+   * Plotter overlay: a dozen dots picked along the artwork, marked ○ □ △ with their screen
+   * coordinates, joined by straight segments and threaded by one smooth curve.
+   */
+  const MARKS = 12;
+  const plot = () => {
+    if (!tctx || !opts.trace) return;
+    const picks: { x: number; y: number }[] = [];
+    const step = Math.floor(N / (MARKS + 1));
+    for (let k = 1; k <= MARKS; k++) {
+      // Nearest visible dot to the evenly spaced slot.
+      for (let d = 0; d < step; d++) {
+        const i = k * step + (d % 2 ? -1 : 1) * Math.ceil(d / 2);
+        if (i >= 0 && i < N && sr[i] > 0.8 && clearFactor(sx[i], sy[i]) >= 1) {
+          picks.push({ x: sx[i], y: sy[i] });
+          break;
+        }
+      }
+    }
+    tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    tctx.clearRect(0, 0, w, h);
+    tctx.strokeStyle = tctx.fillStyle = opts.traceColor ?? '#111';
+    tctx.lineWidth = 1;
+    tctx.font = '10px "Geist Mono Variable", ui-monospace, monospace';
+    if (picks.length < 2) return void (opts.trace.dataset.labels = '[]');
+    // Straight segments.
+    tctx.globalAlpha = 0.55;
+    tctx.beginPath();
+    picks.forEach((p, i) => (i ? tctx.lineTo(p.x, p.y) : tctx.moveTo(p.x, p.y)));
+    tctx.stroke();
+    // Smooth curve through the same points (Catmull-Rom as Béziers).
+    tctx.globalAlpha = 0.9;
+    tctx.beginPath();
+    tctx.moveTo(picks[0].x, picks[0].y);
+    for (let i = 0; i < picks.length - 1; i++) {
+      const p0 = picks[Math.max(0, i - 1)];
+      const p1 = picks[i];
+      const p2 = picks[i + 1];
+      const p3 = picks[Math.min(picks.length - 1, i + 2)];
+      tctx.bezierCurveTo(p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6, p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6, p2.x, p2.y);
+    }
+    tctx.stroke();
+    // Markers and coordinate labels.
+    tctx.globalAlpha = 1;
+    const labels: string[] = [];
+    picks.forEach((p, i) => {
+      const s = 5;
+      tctx.fillStyle = '#fff';
+      tctx.beginPath();
+      if (i % 3 === 0) tctx.arc(p.x, p.y, s, 0, Math.PI * 2);
+      else if (i % 3 === 1) tctx.rect(p.x - s, p.y - s, s * 2, s * 2);
+      else {
+        tctx.moveTo(p.x, p.y - s - 1);
+        tctx.lineTo(p.x + s + 1, p.y + s);
+        tctx.lineTo(p.x - s - 1, p.y + s);
+        tctx.closePath();
+      }
+      tctx.fill();
+      tctx.stroke();
+      const label = `${Math.round(p.x)} ${Math.round(h - p.y)}`;
+      labels.push(label);
+      tctx.fillStyle = opts.traceColor ?? '#111';
+      tctx.fillText(label, p.x - 16, p.y - 10);
+    });
+    opts.trace.dataset.labels = JSON.stringify(labels);
   };
 
   const pose = { yaw: 0, pitch: 0, ty: 0, tp: 0 };
@@ -243,6 +316,7 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
       ctx.fill();
     }
     canvas.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
+    plot();
   };
 
   resize();

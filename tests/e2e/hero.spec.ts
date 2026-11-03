@@ -159,3 +159,22 @@ test('halftone has a slight dreamy blur (user)', async ({ page }) => {
   expect(px).toBeGreaterThan(0.5);
   expect(px).toBeLessThanOrEqual(2.5);
 });
+
+test('plotter trace sits on top of the halftone, crisp, with labelled markers that move', async ({ page }) => {
+  await page.goto('/');
+  const trace = page.locator('canvas[data-trace]');
+  await expect(trace).toBeVisible();
+  expect(await trace.evaluate((c) => getComputedStyle(c).filter)).toBe('none');
+  const z = await page.evaluate(() => [
+    Number(getComputedStyle(document.querySelector('canvas[data-trace]')!).zIndex || 0),
+    Number(getComputedStyle(document.querySelector('canvas[data-halftone]')!).zIndex || 0),
+  ]);
+  expect(z[0]).toBeGreaterThan(z[1]);
+  await page.waitForTimeout(600);
+  const a = await trace.getAttribute('data-labels');
+  const labels = JSON.parse(a!) as string[];
+  expect(labels.length).toBeGreaterThanOrEqual(8);
+  for (const l of labels) expect(l).toMatch(/^\d+ \d+$/);
+  await page.waitForTimeout(1500);
+  expect(await trace.getAttribute('data-labels')).not.toBe(a);
+});
