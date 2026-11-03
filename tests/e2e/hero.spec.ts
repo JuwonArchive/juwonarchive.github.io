@@ -99,7 +99,13 @@ test.describe('core sphere', () => {
     await expect(orbit.locator('mask#sphere-edge circle[filter]')).toHaveCount(1);
     await expect(sphere.locator('[data-outline]')).toHaveCount(0);
     expect(await sphere.locator('[data-body]').getAttribute('mask')).toBe('url(#sphere-edge)');
-    await expect(sphere.locator('[data-bands]')).toHaveCount(1);
+    // Abstract fluid (user request): soft drifting colour fields, no stripes.
+    await expect(sphere.locator('[data-bands]')).toHaveCount(0);
+    const fluid = sphere.locator('[data-fluid]');
+    await expect(fluid).toHaveCount(1);
+    const colours = await fluid.locator('[data-blob]').evaluateAll((els) => els.map((e) => e.getAttribute('data-blob')));
+    expect(new Set(colours)).toEqual(new Set(['blue', 'purple', 'sky']));
+    expect(await fluid.getAttribute('filter')).toMatch(/url\(#fluid\)/);
     await expect(sphere.locator('[data-specular]')).toHaveCount(1);
     await expect(sphere.locator('[data-glow]')).toHaveCount(1);
     expect(await sphere.getAttribute('filter')).toBeNull();
@@ -168,5 +174,6 @@ test('god rays stay short and faint (user: natural, not overdone)', async ({ pag
   const SPHERE_R = 72;
   expect(r.reach).toBeLessThanOrEqual(SPHERE_R * 2.5);
   expect(r.maxOpacity).toBeLessThanOrEqual(0.45);
-  expect(r.count).toBeGreaterThanOrEqual(24);
+  expect(r.count).toBeGreaterThanOrEqual(8);
+  expect(r.count).toBeLessThanOrEqual(14); // user: fewer shafts
 });
