@@ -53,7 +53,8 @@ test.describe('home graphics', () => {
       return { inked: inked / total, dense: dense / total };
     });
     expect(share.inked).toBeGreaterThan(0.08);
-    expect(share.inked).toBeLessThan(0.55);
+    expect(share.inked).toBeGreaterThan(0.15); // denser (user)
+    expect(share.inked).toBeLessThan(0.6);
     expect(share.dense).toBeGreaterThan(0.02);
   });
 
@@ -73,6 +74,21 @@ test.describe('home graphics', () => {
       await page.waitForTimeout(700);
       await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-overlaps', '0');
     }
+  });
+
+  test('the artwork morphs between several forms', async ({ page }) => {
+    test.setTimeout(40_000);
+    await page.goto('/');
+    const canvas = page.locator('canvas[data-halftone]');
+    const forms = (await canvas.getAttribute('data-forms'))!.split(',');
+    expect(forms).toEqual(expect.arrayContaining(['ribbon', 'cloud', 'ripple']));
+    const seen = new Set<string>();
+    for (let i = 0; i < 22 && seen.size < 2; i++) {
+      seen.add((await canvas.getAttribute('data-form'))!);
+      await page.waitForTimeout(800);
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(2);
+    await expect(canvas).toHaveAttribute('data-overlaps', '0');
   });
 
   test('the ribbon turns toward the pointer', async ({ page, isMobile }) => {
