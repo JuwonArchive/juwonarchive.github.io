@@ -227,3 +227,15 @@ test('halftone has a very slight blur (user)', async ({ page }) => {
   expect(px).toBeGreaterThan(0.2);
   expect(px).toBeLessThanOrEqual(0.8);
 });
+
+test('graphic is centred on both axes, desktop and phone (user)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const r = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+    const b = c.getBoundingClientRect();
+    return { x: b.left + Number(c.dataset.cx), y: b.top + Number(c.dataset.cy), w: innerWidth, h: innerHeight };
+  });
+  expect(Math.abs(r.x - r.w / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(r.y - r.h / 2)).toBeLessThanOrEqual(1);
+});
