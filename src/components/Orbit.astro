@@ -70,19 +70,32 @@ const rays = Array.from({ length: RAYS }, (_, i) => {
       <stop offset="50%" stop-color="#4963fd"></stop>
       <stop offset="100%" stop-color="#443be3"></stop>
     </radialGradient>
-    <!-- Abstract fluid: drifting colour fields, warped by slow turbulence and melted together. -->
-    <filter id="fluid" x="-30%" y="-30%" width="160%" height="160%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="2" seed="7">
-        <animate attributeName="baseFrequency" values="0.009;0.014;0.010;0.009" dur="11s" repeatCount="indefinite"></animate>
+    <!-- Silk bands: diagonal folds cycling indigo → blue → sky → white and back, drifting slowly. -->
+    <linearGradient id="silk" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox" spreadMethod="repeat" gradientTransform="rotate(40 .5 .5) scale(.21 1)">
+      <stop offset="0" stop-color="#443be3"></stop>
+      <stop offset=".22" stop-color="#4963fd"></stop>
+      <stop offset=".40" stop-color="#49c2ff"></stop>
+      <stop offset=".50" stop-color="#f0faff"></stop>
+      <stop offset=".60" stop-color="#49c2ff"></stop>
+      <stop offset=".80" stop-color="#4963fd"></stop>
+      <stop offset="1" stop-color="#443be3"></stop>
+      <animateTransform attributeName="gradientTransform" type="translate" additive="sum" values="0 0; 1 0" dur="9s" repeatCount="indefinite"></animateTransform>
+    </linearGradient>
+    <filter id="silk-warp" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0035 0.006" numOctaves="1" seed="9">
+        <animate attributeName="baseFrequency" values="0.003 0.0055;0.0042 0.0072;0.003 0.0055" dur="12s" repeatCount="indefinite"></animate>
       </feTurbulence>
-      <feDisplacementMap in="SourceGraphic" scale="34" xChannelSelector="R" yChannelSelector="G">
-        <animate attributeName="scale" values="26;42;30;26" dur="8s" repeatCount="indefinite"></animate>
+      <feDisplacementMap in="SourceGraphic" scale="78" xChannelSelector="R" yChannelSelector="G" result="folds">
+        <animate attributeName="scale" values="64;92;64" dur="10s" repeatCount="indefinite"></animate>
       </feDisplacementMap>
-      <feGaussianBlur stdDeviation="9"></feGaussianBlur>
+      <!-- Soft folds plus a little bloom on the bright crests. -->
+      <feGaussianBlur in="folds" stdDeviation="3" result="soft"></feGaussianBlur>
+      <feGaussianBlur in="folds" stdDeviation="9" result="bloom"></feGaussianBlur>
+      <feBlend in="soft" in2="bloom" mode="screen"></feBlend>
     </filter>
     <radialGradient id="sphere-shade" cx="50%" cy="50%" r="50%">
       <stop offset="70%" stop-color="#1e1a7a" stop-opacity="0"></stop>
-      <stop offset="100%" stop-color="#1e1a7a" stop-opacity=".3"></stop>
+      <stop offset="100%" stop-color="#1e1a7a" stop-opacity=".4"></stop>
     </radialGradient>
     <linearGradient id="specular" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#f0faff" stop-opacity=".85"></stop>
@@ -139,23 +152,7 @@ const rays = Array.from({ length: RAYS }, (_, i) => {
     <circle data-halo r="110" fill="url(#sphere-halo)" filter="url(#halo-soft)"></circle>
     <g data-body mask="url(#sphere-edge)">
       <circle r="72" fill="url(#sphere-body)"></circle>
-      <g data-fluid filter="url(#fluid)">
-        <ellipse data-blob="indigo" cx="-26" cy="-14" rx="46" ry="34" fill="#443be3">
-          <animateTransform attributeName="transform" type="translate" values="0 0; 24 18; -10 30; 0 0" dur="13s" repeatCount="indefinite"></animateTransform>
-        </ellipse>
-        <ellipse data-blob="sky" cx="22" cy="20" rx="40" ry="30" fill="#49c2ff">
-          <animateTransform attributeName="transform" type="translate" values="0 0; -26 -10; -6 -28; 0 0" dur="11s" repeatCount="indefinite"></animateTransform>
-        </ellipse>
-        <ellipse data-blob="blue" cx="10" cy="-30" rx="38" ry="26" fill="#4963fd">
-          <animateTransform attributeName="transform" type="translate" values="0 0; -18 24; 14 10; 0 0" dur="9s" repeatCount="indefinite"></animateTransform>
-        </ellipse>
-        <ellipse data-blob="blue" cx="30" cy="-2" rx="24" ry="40" fill="#4963fd" opacity=".8">
-          <animateTransform attributeName="transform" type="rotate" values="0 0 0; 40 0 0; -20 0 0; 0 0 0" dur="15s" repeatCount="indefinite"></animateTransform>
-        </ellipse>
-        <ellipse data-blob="white" cx="-34" cy="30" rx="26" ry="18" fill="#f0faff" opacity=".85">
-          <animateTransform attributeName="transform" type="translate" values="0 0; 20 -16; 30 6; 0 0" dur="12s" repeatCount="indefinite"></animateTransform>
-        </ellipse>
-      </g>
+      <rect data-bands x="-110" y="-110" width="220" height="220" fill="url(#silk)" filter="url(#silk-warp)"></rect>
       <circle r="72" fill="url(#sphere-shade)"></circle>
       <!-- Bright white crescent along the upper-right edge. -->
       <rect data-specular x="-72" y="-72" width="144" height="144" fill="url(#specular)" mask="url(#crescent)" filter="url(#crescent-soft)" opacity=".2">

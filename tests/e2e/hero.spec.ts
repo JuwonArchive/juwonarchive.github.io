@@ -99,14 +99,17 @@ test.describe('core sphere', () => {
     await expect(orbit.locator('mask#sphere-edge circle[filter]')).toHaveCount(1);
     await expect(sphere.locator('[data-outline]')).toHaveCount(0);
     expect(await sphere.locator('[data-body]').getAttribute('mask')).toBe('url(#sphere-edge)');
-    // Abstract fluid (user request): soft drifting colour fields, no stripes.
-    await expect(sphere.locator('[data-bands]')).toHaveCount(0);
-    const fluid = sphere.locator('[data-fluid]');
-    await expect(fluid).toHaveCount(1);
-    // Palette (user): #F0FAFF, #49C2FF, #4963FD, #443BE3.
-    const fills = await fluid.locator('[data-blob]').evaluateAll((els) => els.map((e) => e.getAttribute('fill')!.toLowerCase()));
-    expect(new Set(fills)).toEqual(new Set(['#f0faff', '#49c2ff', '#4963fd', '#443be3']));
-    expect(await fluid.getAttribute('filter')).toMatch(/url\(#fluid\)/);
+    // Silk-like diagonal wave bands (user reference), built only from the four palette colours.
+    const bands = sphere.locator('[data-bands]');
+    await expect(bands).toHaveCount(1);
+    await expect(sphere.locator('[data-blob]')).toHaveCount(0);
+    const stops = await page.locator('#silk stop').evaluateAll((els) => els.map((e) => e.getAttribute('stop-color')!.toLowerCase()));
+    expect(new Set(stops)).toEqual(new Set(['#f0faff', '#49c2ff', '#4963fd', '#443be3']));
+    expect(await bands.getAttribute('filter')).toMatch(/url\(#silk-warp\)/);
+    // Gentle curves, not jagged: one octave of low-frequency noise.
+    const turb = page.locator('#silk-warp feTurbulence');
+    expect(await turb.getAttribute('numOctaves')).toBe('1');
+    expect(Math.max(...(await turb.getAttribute('baseFrequency'))!.split(/\s+/).map(Number))).toBeLessThanOrEqual(0.01);
     await expect(sphere.locator('[data-specular]')).toHaveCount(1);
     await expect(sphere.locator('[data-glow]')).toHaveCount(1);
     expect(await sphere.getAttribute('filter')).toBeNull();
@@ -176,7 +179,7 @@ test.describe('glow and ray tone', () => {
     const sharp = createRequire(import.meta.url)('sharp');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    const box = (await page.locator('[data-sphere] [data-body]').boundingBox())!;
+    const box = (await page.locator('[data-sphere] [data-body] > circle').first().boundingBox())!;
     const R = box.width / 2;
     const cx = box.x + R;
     const cy = box.y + R;
@@ -245,7 +248,7 @@ test.describe('ray motion and orbit spacing', () => {
 test('sphere is sized in proportion to the orbits', async ({ page }) => {
   await page.goto('/');
   const r = await page.evaluate(() => {
-    const body = document.querySelector('[data-sphere] [data-body]')!.getBoundingClientRect();
+    const body = document.querySelector('[data-sphere] [data-body] > circle')!.getBoundingClientRect();
     const ring = document.querySelector('[data-orbit] .ring')!.getBoundingClientRect();
     return body.width / ring.width;
   });
