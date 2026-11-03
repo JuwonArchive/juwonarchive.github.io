@@ -16,7 +16,7 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
     mountOrbitHalftone({
       dots,
       lines,
-      dotColor: '#c9d2db',
+      dotColor: '#dce3ea',
       lineColor: '#111111',
       labels: JSON.parse(lines?.dataset.tools ?? '[]'),
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -33,9 +33,12 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
     height: 100%;
   }
   /* Soft halftone (like a screen print) under a crisp line drawing. */
+  /* Faint fine-dot grid is a static CSS pattern (no per-frame cost). */
   .halftone {
     z-index: 0;
-    filter: blur(0.8px);
+    background-image: radial-gradient(circle, rgba(220, 227, 234, 0.45) 0.6px, transparent 1px);
+    background-size: 9px 9px;
+    background-position: 0 0;
   }
   .trace {
     z-index: 1;

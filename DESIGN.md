@@ -174,4 +174,4 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 
 - Display words and small text are **Ink `#111111`** (black, user decision); Muted `#7B8794` for secondary labels.
 - Tints are icy (ice, frost, mist, steel). No warm tones anywhere.
-- Home: JUWON at the bottom; a small mono top bar (label left, visitor's local time right). Behind, a 3D orbital line drawing (tilted orbits, dashed meridians, centre ellipses) is read through a halftone screen (`#A9B4BF` dots, faint fine grid elsewhere), with a crisp thin version on top whose markers carry the tool names. Rotates slowly, turns toward the pointer, may run behind the name. Plain white, no fog.
+- Home: JUWON at the bottom; a small mono top bar (label left, visitor's local time right). Behind, a 3D orbital line drawing (tilted orbits, dashed meridians, centre ellipses) is read through a halftone screen (`#DCE3EA` dots, faint CSS fine-dot grid elsewhere; ink field computed on the CPU, no GPU readback), with a crisp thin version on top whose markers carry the tool names. Rotates slowly, turns toward the pointer, may run behind the name. Plain white, no fog.

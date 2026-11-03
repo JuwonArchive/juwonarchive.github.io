@@ -1,9 +1,9 @@
 /**
  * Orbit halftone.
  * 1. A 3D orbital line drawing (sphere silhouette, tilted orbits, dashed meridians, centre ellipses)
- *    is drawn thick into a small offscreen buffer and blurred.
- * 2. That buffer is read through a halftone screen: darker → bigger dot. A faint fine-dot grid covers
- *    the rest of the page.
+ *    is splatted as soft Gaussians into a per-cell ink field (CPU only, no GPU readback).
+ * 2. The field is drawn as a halftone screen: more ink → bigger dot, batched by size/alpha.
+ *    The faint fine-dot grid behind it is a CSS background.
  * 3. A crisp, thin version of the same drawing sits on a second canvas with markers labelled by tools.
  * Rotates slowly and turns toward the pointer; draws once for reduced-motion visitors.
  */
@@ -19,7 +19,6 @@ type Opts = {
 type V3 = [number, number, number];
 
 const TAU = Math.PI * 2;
-const SCALE = 3; // offscreen buffer is 1/3 of the screen
 const PITCH = 9; // halftone cell, CSS px
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -43,9 +42,9 @@ export function mountOrbitHalftone(opts: Opts) {
   const lctx = lines?.getContext('2d') ?? null;
   if (!dctx) return;
   dots.dataset.form = 'orbit';
-  const off = document.createElement('canvas');
-  const octx = off.getContext('2d', { willReadFrequently: true })!;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let field = new Float32Array(0);
+  // Halftone dots are soft by nature; 1.5× is plenty and cheaper on retina screens.
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   let w = 0;
   let h = 0;
   const pose = { yaw: 0, pitch: 0, ty: 0, tp: 0 };
@@ -60,14 +59,12 @@ export function mountOrbitHalftone(opts: Opts) {
       c.width = Math.round(w * dpr);
       c.height = Math.round(h * dpr);
     }
-    off.width = Math.ceil(w / SCALE);
-    off.height = Math.ceil(h / SCALE);
   };
 
   const geometry = (t: number) => {
     const mobile = w < 768;
     const R = mobile ? w * 0.44 : Math.min(w * 0.24, h * 0.38);
-    const cx = w * (mobile ? 0.5 : 0.55);
+    const cx = w * 0.5; // centred
     const cy = h * 0.5; // centred on phones and desktop
     const yaw = pose.yaw + t * 0.08;
     const pitch = 0.32 + pose.pitch;
@@ -108,72 +105,86 @@ export function mountOrbitHalftone(opts: Opts) {
   const draw = (t: number) => {
     const g = geometry(t);
 
-    // 1. Thick, blurred drawing in the offscreen buffer.
-    const k = 1 / SCALE;
-    octx.setTransform(1, 0, 0, 1, 0, 0);
-    octx.clearRect(0, 0, off.width, off.height);
-    octx.filter = 'blur(2.5px)';
-    octx.strokeStyle = '#000';
-    octx.lineCap = 'round';
-    octx.lineWidth = 4.5;
-    octx.beginPath();
-    octx.arc(g.cx * k, g.cy * k, g.R * k, 0, TAU);
-    octx.stroke();
-    // Orbit segments: darker in front, fainter behind, with a slow pulse travelling along each line.
-    g.orbits.forEach((o, oi) => {
-      for (let i = 1; i < o.length; i++) {
-        const a = o[i - 1];
-        const b = o[i];
-        const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, (a.z + b.z) / 2));
-        const pulse = 0.55 + 0.45 * Math.sin(i * 0.12 - t * 1.4 + oi * 2);
-        octx.globalAlpha = 0.25 + 0.75 * front * pulse;
-        octx.lineWidth = 2.5 + 3.5 * front;
-        octx.beginPath();
-        octx.moveTo(a.x * k, a.y * k);
-        octx.lineTo(b.x * k, b.y * k);
-        octx.stroke();
+    // 1. Ink field on the halftone grid, computed on the CPU (no GPU readback):
+    //    every line is sampled and splatted as a soft Gaussian into the cells around it.
+    const cols = Math.ceil(w / PITCH);
+    const rows = Math.ceil(h / PITCH);
+    if (field.length !== cols * rows) field = new Float32Array(cols * rows);
+    else field.fill(0);
+    const splat = (x: number, y: number, amount: number, radius: number) => {
+      const cxi = x / PITCH - 0.5;
+      const cyi = y / PITCH - 0.5;
+      const rc = Math.ceil((2.6 * radius) / PITCH); // cover ~2.6σ so the falloff stays round
+      const inv = 1 / (2 * (radius / PITCH) ** 2);
+      const x0 = Math.max(0, Math.floor(cxi - rc));
+      const x1 = Math.min(cols - 1, Math.ceil(cxi + rc));
+      const y0 = Math.max(0, Math.floor(cyi - rc));
+      const y1 = Math.min(rows - 1, Math.ceil(cyi + rc));
+      for (let yy = y0; yy <= y1; yy++)
+        for (let xx = x0; xx <= x1; xx++) {
+          const d2 = (xx - cxi) ** 2 + (yy - cyi) ** 2;
+          field[yy * cols + xx] += amount * Math.exp(-d2 * inv);
+        }
+    };
+    const along = (pts: { x: number; y: number }[], amount: (i: number, z: number) => number, radius: number) => {
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1];
+        const p1 = pts[i];
+        const len = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+        const n = Math.max(1, Math.ceil(len / (PITCH * 0.8)));
+        const z = (((p0 as { z?: number }).z ?? 0) + ((p1 as { z?: number }).z ?? 0)) / 2;
+        const amt = amount(i, z) * (len / n / PITCH);
+        for (let s = 0; s < n; s++) splat(p0.x + ((p1.x - p0.x) * s) / n, p0.y + ((p1.y - p0.y) * s) / n, amt, radius);
       }
-    });
-    octx.globalAlpha = 1;
-    octx.lineWidth = 3;
-    for (const o of g.centre) stroke(octx, o, k);
-    octx.globalAlpha = 0.45;
-    for (const o of g.dashed) stroke(octx, o, k);
-    // Pointer: a soft glow in the buffer makes nearby dots swell.
-    if (ptr.on > 0.01) {
-      octx.globalAlpha = 0.9 * ptr.on;
-      const gr = octx.createRadialGradient(ptr.x * k, ptr.y * k, 0, ptr.x * k, ptr.y * k, 120 * k);
-      gr.addColorStop(0, '#000');
-      gr.addColorStop(1, 'rgba(0,0,0,0)');
-      octx.fillStyle = gr;
-      octx.fillRect(0, 0, off.width, off.height);
-    }
-    octx.globalAlpha = 1;
-    octx.filter = 'none';
-    const img = octx.getImageData(0, 0, off.width, off.height).data;
+    };
+    const silhouette = Array.from({ length: 121 }, (_, i) => ({ x: g.cx + Math.cos((i / 120) * TAU) * g.R, y: g.cy + Math.sin((i / 120) * TAU) * g.R }));
+    along(silhouette, () => 0.4, 7);
+    // Orbits: darker in front, fainter behind, with a slow pulse travelling along each line.
+    g.orbits.forEach((o, oi) =>
+      along(
+        o,
+        (i, z) => {
+          const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, z));
+          return (0.2 + 0.8 * front * (0.5 + 0.5 * Math.sin(i * 0.12 - t * 1.4 + oi * 2))) * 0.45;
+        },
+        7.5,
+      ),
+    );
+    for (const o of g.centre) along(o, () => 0.3, 6);
+    for (const o of g.dashed) along(o, () => 0.12, 6);
+    // Pointer: a soft swell under the cursor.
+    if (ptr.on > 0.01) splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
-    // 2. Halftone screen.
+    // 2. Halftone screen, batched: dots of similar size/alpha share one path.
     dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     dctx.clearRect(0, 0, w, h);
     dctx.fillStyle = opts.dotColor;
     const max = PITCH * 0.5;
-    const steps = new Set<number>();
-    for (let y = PITCH / 2; y < h; y += PITCH) {
-      for (let x = PITCH / 2; x < w; x += PITCH) {
-        const ox = Math.min(off.width - 1, Math.floor(x / SCALE));
-        const oy = Math.min(off.height - 1, Math.floor(y / SCALE));
-        const a = img[(oy * off.width + ox) * 4 + 3] / 255;
-        // Size follows intensity smoothly; a faint fine grid covers the rest.
-        const r = a > 0.02 ? 0.6 + (max - 0.6) * Math.pow(a, 0.85) : 0.5;
-        if (a > 0.02) steps.add(Math.round(r * 4));
-        dctx.globalAlpha = a > 0.02 ? 0.45 + 0.55 * a : 0.3;
-        dctx.beginPath();
-        dctx.arc(x, y, r, 0, TAU);
-        dctx.fill();
+    const buckets = new Map<number, Path2D>();
+    for (let yy = 0; yy < rows; yy++)
+      for (let xx = 0; xx < cols; xx++) {
+        const a = Math.min(1, field[yy * cols + xx]);
+        if (a < 0.04) continue;
+        const rq = Math.round((0.6 + (max - 0.6) * Math.pow(a, 0.85)) * 4); // quarter-px steps
+        const aq = Math.round((0.45 + 0.55 * a) * 6); // 6 alpha steps
+        const key = rq * 16 + aq;
+        let path = buckets.get(key);
+        if (!path) buckets.set(key, (path = new Path2D()));
+        const x = xx * PITCH + PITCH / 2;
+        const y = yy * PITCH + PITCH / 2;
+        path.moveTo(x + rq / 4, y);
+        path.arc(x, y, rq / 4, 0, TAU);
       }
+    const sizes = new Set<number>();
+    for (const [key, path] of buckets) {
+      sizes.add(key >> 4);
+      dctx.globalAlpha = (key & 15) / 6;
+      dctx.fill(path);
     }
     dctx.globalAlpha = 1;
-    dots.dataset.sizeSteps = String(steps.size);
+    dots.dataset.sizeSteps = String(sizes.size);
+    dots.dataset.readback = 'none';
+    dots.dataset.cx = String(Math.round(g.cx));
 
     // 3. Crisp thin line art, markers and labels.
     if (lctx && lines) {
@@ -293,11 +304,14 @@ export function mountOrbitHalftone(opts: Opts) {
     { passive: true },
   );
 
+  // Pause when the tab is hidden or the artwork is scrolled away.
+  let visible = true;
+  new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe(dots);
   let last = 0;
   const start = performance.now();
   const loop = (now: number) => {
     requestAnimationFrame(loop);
-    if (now - last < 33) return;
+    if (!visible || document.hidden || now - last < 33) return;
     last = now;
     pose.yaw += (pose.ty - pose.yaw) * 0.08;
     pose.pitch += (pose.tp - pose.pitch) * 0.08;

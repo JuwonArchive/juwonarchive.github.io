@@ -110,7 +110,7 @@ test.describe('home graphics', () => {
     expect(Number(await lines.getAttribute('data-dotted'))).toBeGreaterThanOrEqual(4);
     const color = (await page.locator('canvas[data-halftone]').getAttribute('data-dot-color'))!;
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-    expect((r + g + b) / 3).toBeGreaterThan(195); // lighter than before (#a9b4bf ≈ 180)
+    expect((r + g + b) / 3).toBeGreaterThan(215); // paler again (user)
   });
 
   test('the artwork may run behind JUWON (no cut-off zone)', async ({ page, isMobile }) => {
@@ -175,3 +175,33 @@ test.describe('opening animation', () => {
   });
 });
 
+
+test('home artwork is light enough to animate smoothly', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.setViewportSize({ width: 1840, height: 880 });
+  await page.goto('/');
+  await page.waitForTimeout(2500);
+  const fps = await page.evaluate(
+    () =>
+      new Promise<number>((res) => {
+        const ts: number[] = [];
+        const f = (t: number) => {
+          ts.push(t);
+          if (ts.length < 60) requestAnimationFrame(f);
+          else res((ts.length - 1) / ((ts.at(-1)! - ts[0]) / 1000));
+        };
+        requestAnimationFrame(f);
+      }),
+  );
+  expect(fps).toBeGreaterThan(20);
+  // No GPU readback in the render loop.
+  expect(await page.locator('canvas[data-halftone]').getAttribute('data-readback')).toBe('none');
+});
+
+test('graphic is horizontally centred on desktop (user)', async ({ page, isMobile }) => {
+  test.skip(isMobile);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const cx = Number(await page.locator('canvas[data-halftone]').getAttribute('data-cx'));
+  expect(Math.abs(cx - page.viewportSize()!.width / 2)).toBeLessThan(2);
+});
