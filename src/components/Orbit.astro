@@ -33,7 +33,11 @@ const outer = R0 + (works.length - 1) * STEP + 70;
 
 <svg class="orbit" data-orbit viewBox={`${-outer} ${-outer} ${outer * 2} ${outer * 2}`} aria-hidden="true">
   <defs>
-    <clipPath id="sphere-clip"><circle r="72"></circle></clipPath>
+    <!-- Soft edge: the sphere fades out over a few pixels instead of a hard outline. -->
+    <filter id="edge-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.5"></feGaussianBlur></filter>
+    <mask id="sphere-edge" maskUnits="userSpaceOnUse" x="-90" y="-90" width="180" height="180">
+      <circle r="69" fill="#fff" filter="url(#edge-soft)"></circle>
+    </mask>
     <!-- Vivid glass sphere: deep blue body, flowing light bands, dark rim, white crescent. -->
     <radialGradient id="sphere-body" cx="50%" cy="50%" r="50%" fx="38%" fy="62%">
       <stop offset="0%" stop-color="#4aa8ff"></stop>
@@ -89,14 +93,13 @@ const outer = R0 + (works.length - 1) * STEP + 70;
 
   <g data-sphere>
     <circle class="glow" data-glow cx="-14" cy="18" r="150" fill="url(#sphere-glow)" filter="url(#soft-glow)"></circle>
-    <g clip-path="url(#sphere-clip)">
+    <g data-body mask="url(#sphere-edge)">
       <circle r="72" fill="url(#sphere-body)"></circle>
       <rect data-bands x="-110" y="-110" width="220" height="220" fill="url(#bands)" filter="url(#ripple)"></rect>
       <circle r="72" fill="url(#sphere-shade)"></circle>
       <!-- Bright white crescent along the upper-right edge. -->
       <rect data-specular x="-72" y="-72" width="144" height="144" fill="url(#specular)" mask="url(#crescent)" filter="url(#crescent-soft)"></rect>
     </g>
-    <circle r="71.5" fill="none" stroke="#bfe9ff" stroke-opacity=".7" stroke-width="1"></circle>
   </g>
 
   {

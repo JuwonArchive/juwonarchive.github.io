@@ -89,14 +89,16 @@ test('tool labels never sit on top of their dot, at any point in the rotation', 
 });
 
 test.describe('core sphere', () => {
-  test('is a crisp glass sphere with flowing bands, a specular rim and a glow', async ({ page }) => {
+  test('is a soft-edged glass sphere with flowing bands, a specular rim and a glow', async ({ page }) => {
     await page.goto('/');
     const orbit = page.locator('[data-orbit]');
     await expect(orbit.locator('.nucleus')).toHaveCount(0);
     const sphere = orbit.locator('[data-sphere]');
     await expect(sphere).toHaveCount(1);
-    // Crisp edge: the inside is clipped by a plain circle; the edge itself is never displaced.
-    await expect(orbit.locator('clipPath#sphere-clip circle')).toHaveCount(1);
+    // Soft edge (user request): the body is masked by a blurred circle, with no outline ring.
+    await expect(orbit.locator('mask#sphere-edge circle[filter]')).toHaveCount(1);
+    await expect(sphere.locator('[data-outline]')).toHaveCount(0);
+    expect(await sphere.locator('[data-body]').getAttribute('mask')).toBe('url(#sphere-edge)');
     await expect(sphere.locator('[data-bands]')).toHaveCount(1);
     await expect(sphere.locator('[data-specular]')).toHaveCount(1);
     await expect(sphere.locator('[data-glow]')).toHaveCount(1);
