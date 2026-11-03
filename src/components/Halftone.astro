@@ -1,0 +1,29 @@
+---
+/** Dense halftone dots in the display colour, filling the page behind the name. */
+---
+
+<canvas class="halftone" data-halftone data-color="#dae0e5" aria-hidden="true"></canvas>
+
+<script>
+  import { mountHalftone } from '../scripts/halftone';
+  const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
+  if (canvas) {
+    const pitch = window.matchMedia('(max-width: 767px)').matches ? 10 : 13;
+    canvas.dataset.pitch = String(pitch);
+    mountHalftone(canvas, {
+      color: canvas.dataset.color ?? '#dae0e5',
+      pitch,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      avoid: () => document.querySelector('.home h1'),
+    });
+  }
+</script>
+
+<style>
+  .halftone {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+</style>

@@ -5,13 +5,18 @@ description: A bright, lab-like gallery. Work sits on a pure white canvas that t
 
 colors:
   canvas: "#FFFFFF"
-  tint-lavender: "#E6E4F2"
-  tint-mint: "#E3EEE8"
-  tint-blush: "#F2E6E4"
-  tint-sky: "#E4ECF2"
-  ink: "#111111"
-  muted: "#6B6B6B"
-  hairline: "#DDDDDD"
+  tint-ice: "#EEF3F8"
+  tint-frost: "#E7EEF6"
+  tint-mist: "#EAF1F4"
+  tint-steel: "#E9ECF6"
+  display: "#DAE0E5"
+  ink: "#1D2430"
+  muted: "#7B8794"
+  hairline: "#DCE2E8"
+  signal-white: "#F0FAFF"
+  signal-sky: "#49C2FF"
+  signal-blue: "#4963FD"
+  signal-indigo: "#443BE3"
   surface: "#FFFFFF"
   on-ink: "#FFFFFF"
 
@@ -163,3 +168,10 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - Don't add an accent color, gradients or shadows to UI.
 - Don't use Korean in headings, nav or buttons.
 - Don't put more than one display-size word per screen except the Home category list.
+
+
+## Mood update (2026-11-03): cold & experimental
+
+- Display words (JUWON, ARCHIVE, INFO, work titles) use **Display `#DAE0E5`**, a pale cool grey. Small text stays readable in **Ink `#1D2430`** (blue-black) and **Muted `#7B8794`**.
+- Tints are icy (ice, frost, mist, steel). No warm tones anywhere.
+- The only saturated colour is the **signal palette** in the home disc: `#F0FAFF → #49C2FF → #4963FD → #443BE3`, a flat radial gradient with ripples spreading from the centre, labelled `JW / SIGNAL · 04`.

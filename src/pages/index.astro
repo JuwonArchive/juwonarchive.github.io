@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
-import Orbit from '../components/Orbit.astro';
+import Halftone from '../components/Halftone.astro';
+import Fog from '../components/Fog.astro';
 import Intro from '../components/Intro.astro';
 import { config } from '../config';
 import { longestWord } from '../lib/fit';
@@ -12,7 +13,8 @@ const site = loadSite();
 <Base title={config.homeTitle}>
   <main class="home">
     <Intro site={site} />
-    <div class="hero-slot" aria-hidden="true"><Orbit works={site.works} /></div>
+    <Fog />
+    <div class="hero-slot" aria-hidden="true"><Halftone /></div>
     <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`} aria-label={config.headline}>
       {[...config.headline].map((ch, i) => <span class="l" style={`--i:${i}`} aria-hidden="true">{ch}</span>)}
     </h1>
@@ -33,22 +35,22 @@ const site = loadSite();
     min-height: 480px;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: space-between;
     padding: var(--gutter);
     overflow: hidden;
   }
-  /* The diagram sits behind the name (user request). */
+  /* Halftone behind the name, above the fog. */
   .hero-slot {
     position: absolute;
     inset: 0;
-    z-index: 0;
-    display: grid;
-    place-items: center;
+    z-index: 1;
     pointer-events: none;
   }
+  /* JUWON sits at the top (user request). */
   .headline {
     position: relative;
-    z-index: 1;
+    z-index: 2;
+    margin-top: clamp(8px, 2vw, 24px);
     pointer-events: none;
     /* JUWON's W and O are wider than average, so budget ~0.98em per glyph. */
     --fit-max: 360px;
@@ -57,7 +59,7 @@ const site = loadSite();
   }
   .bar {
     position: relative;
-    z-index: 2;
+    z-index: 3;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;

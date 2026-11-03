@@ -13,5 +13,5 @@ export const config = {
   homeTitle: 'JUWON — 3D · AI · Graphic Designer',
   description: 'Portfolio of JUWON — 3D, AI-generated motion and graphic design. Based in Ilsan, Korea.',
   /** Background tints cycled per work index. */
-  pastels: ['#E6E4F2', '#E3EEE8', '#F2E6E4', '#E4ECF2'],
+  pastels: ['#EEF3F8', '#E7EEF6', '#EAF1F4', '#E9ECF6'],
 };
