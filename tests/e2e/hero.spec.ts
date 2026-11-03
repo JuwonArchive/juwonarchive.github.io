@@ -221,3 +221,31 @@ test.describe('glow and ray tone', () => {
     expect(mid.r - root.r).toBeGreaterThanOrEqual(35); // clearly paler further out
   });
 });
+
+test.describe('ray motion and orbit spacing', () => {
+  test('each ray reaches out and pulls back on its own rhythm', async ({ page }) => {
+    await page.goto('/');
+    const timings = await page.locator('[data-godrays] path').evaluateAll((paths) =>
+      paths.map((p) => {
+        const grow = p.querySelector('animateTransform[type="scale"]');
+        return { dur: grow?.getAttribute('dur'), begin: grow?.getAttribute('begin') };
+      }),
+    );
+    expect(timings.every((t) => t.dur && t.begin)).toBe(true);
+    expect(new Set(timings.map((t) => t.dur)).size).toBeGreaterThanOrEqual(5);
+    expect(new Set(timings.map((t) => t.begin)).size).toBeGreaterThanOrEqual(5);
+    expect(await page.locator('[data-orbit]').evaluate((svg: SVGSVGElement) => svg.animationsPaused())).toBe(false);
+  });
+
+  test('rays hold still with reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    expect(await page.locator('[data-orbit]').evaluate((svg: SVGSVGElement) => svg.animationsPaused())).toBe(true);
+  });
+
+  test('orbits are spaced wider apart (user request)', async ({ page }) => {
+    await page.goto('/');
+    const radii = await page.locator('[data-orbit] .ring').evaluateAll((rs) => rs.map((r) => Number(r.getAttribute('r'))));
+    for (let i = 1; i < radii.length; i++) expect(radii[i] - radii[i - 1]).toBeGreaterThanOrEqual(110);
+  });
+});

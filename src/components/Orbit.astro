@@ -11,7 +11,7 @@ interface Props {
 const { works } = Astro.props;
 const ascii = (t: string) => /^[\x20-\x7E]+$/.test(t);
 const R0 = 150;
-const STEP = Math.min(80, 330 / Math.max(works.length, 1));
+const STEP = Math.min(115, 460 / Math.max(works.length, 1));
 const shells = works.map((w, i) => {
   const r = R0 + i * STEP;
   const tags = w.tags.filter(ascii).slice(0, 8);
@@ -47,6 +47,10 @@ const rays = Array.from({ length: RAYS }, (_, i) => {
   const a = (angle * Math.PI) / 180;
   const at = (t: number, r: number) => `${(Math.cos(t) * r).toFixed(1)} ${(Math.sin(t) * r).toFixed(1)}`;
   return {
+    // Irregular reach: every ray has its own period, phase and stretch.
+    dur: `${(3.2 + rand(i + 31) * 4.6).toFixed(1)}s`,
+    begin: `-${(rand(i + 41) * 6).toFixed(1)}s`,
+    scale: `${(0.68 + rand(i + 51) * 0.12).toFixed(2)};${(1.02 + rand(i + 61) * 0.16).toFixed(2)};${(0.8 + rand(i + 71) * 0.1).toFixed(2)};${(0.68 + rand(i + 51) * 0.12).toFixed(2)}`,
     d: `M${at(a - half * 0.4, SPHERE_R * 0.92)} L${at(a - half, len)} L${at(a + half, len)} L${at(a + half * 0.4, SPHERE_R * 0.92)} Z`,
     opacity: Number((0.18 + weight * 0.62 * (0.75 + rand(i + 21) * 0.25)).toFixed(2)),
   };
@@ -119,7 +123,14 @@ const rays = Array.from({ length: RAYS }, (_, i) => {
   </defs>
 
   <g class="godrays" data-godrays fill="url(#ray-fade)" filter="url(#ray-blur)">
-    {rays.map((r) => <path d={r.d} opacity={r.opacity} />)}
+    {
+      rays.map((r) => (
+        <path d={r.d} opacity={r.opacity}>
+          <animateTransform attributeName="transform" type="scale" values={r.scale} keyTimes="0;0.45;0.7;1" calcMode="spline" keySplines=".4 0 .2 1;.4 0 .2 1;.4 0 .2 1" dur={r.dur} begin={r.begin} repeatCount="indefinite" />
+          <animate attributeName="fill-opacity" values=".45;1;.7;.45" keyTimes="0;0.45;0.7;1" dur={r.dur} begin={r.begin} repeatCount="indefinite" />
+        </path>
+      ))
+    }
   </g>
 
   <g data-sphere>
@@ -185,6 +196,8 @@ const rays = Array.from({ length: RAYS }, (_, i) => {
   // SMIL animations ignore CSS media queries; pause them for reduced-motion visitors.
   const svg = document.querySelector<SVGSVGElement>('[data-orbit]');
   if (svg && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Rays rest fully extended instead of freezing mid-pulse.
+    svg.querySelectorAll('[data-godrays] animate, [data-godrays] animateTransform').forEach((a) => a.remove());
     svg.pauseAnimations();
     svg.setCurrentTime(0);
   }
@@ -192,7 +205,7 @@ const rays = Array.from({ length: RAYS }, (_, i) => {
 
 <style>
   .orbit {
-    width: min(86vmin, 820px);
+    width: min(96vmin, 960px);
     height: auto;
     overflow: visible;
   }
