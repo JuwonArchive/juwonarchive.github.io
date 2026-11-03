@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30_000,
   fullyParallel: true,
+  workers: 2, // the home canvas is heavy; more workers starve frames and flake timing tests
   reporter: [['list']],
   use: { baseURL: 'http://localhost:4321' },
   webServer: {

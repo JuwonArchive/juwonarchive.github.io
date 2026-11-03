@@ -49,6 +49,8 @@ export function mountOrbitHalftone(opts: Opts) {
   let w = 0;
   let h = 0;
   const pose = { yaw: 0, pitch: 0, ty: 0, tp: 0 };
+  const ptr = { x: -9999, y: -9999, tx: -9999, ty: -9999, on: 0, ton: 0 };
+  dots.dataset.dotColor = opts.dotColor;
 
   const resize = () => {
     w = dots.clientWidth;
@@ -83,7 +85,18 @@ export function mountOrbitHalftone(opts: Opts) {
     ].map((o) => o.map(project));
     const dashed = [ring(1, Math.PI / 2, 0), ring(1, Math.PI / 2, Math.PI / 2)].map((o) => o.map(project));
     const centre = [ring(0.62, 0.05, 0), ring(0.3, 0.05, 0)].map((o) => o.map(project));
-    return { R, cx, cy, orbits, dashed, centre, project };
+    // Wireframe: parallels and meridians.
+    const wire: { x: number; y: number; z: number }[][] = [];
+    for (const lat of [-0.66, -0.33, 0.33, 0.66]) {
+      const r = Math.cos(lat * (Math.PI / 2));
+      const yv = Math.sin(lat * (Math.PI / 2));
+      wire.push(ring(r, 0, 0, 120).map(([x, , z]) => project([x, yv, z])));
+    }
+    for (let m = 0; m < 6; m++) wire.push(ring(1, Math.PI / 2, 0, 120).map(([x, y, z]) => {
+      const a = (m / 6) * Math.PI;
+      return project([x * Math.cos(a) - z * Math.sin(a), y, x * Math.sin(a) + z * Math.cos(a)]);
+    }));
+    return { R, cx, cy, orbits, dashed, centre, wire, project };
   };
 
   const stroke = (ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], k = 1) => {
@@ -106,11 +119,35 @@ export function mountOrbitHalftone(opts: Opts) {
     octx.beginPath();
     octx.arc(g.cx * k, g.cy * k, g.R * k, 0, TAU);
     octx.stroke();
-    for (const o of g.orbits) stroke(octx, o, k);
+    // Orbit segments: darker in front, fainter behind, with a slow pulse travelling along each line.
+    g.orbits.forEach((o, oi) => {
+      for (let i = 1; i < o.length; i++) {
+        const a = o[i - 1];
+        const b = o[i];
+        const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, (a.z + b.z) / 2));
+        const pulse = 0.55 + 0.45 * Math.sin(i * 0.12 - t * 1.4 + oi * 2);
+        octx.globalAlpha = 0.25 + 0.75 * front * pulse;
+        octx.lineWidth = 2.5 + 3.5 * front;
+        octx.beginPath();
+        octx.moveTo(a.x * k, a.y * k);
+        octx.lineTo(b.x * k, b.y * k);
+        octx.stroke();
+      }
+    });
+    octx.globalAlpha = 1;
     octx.lineWidth = 3;
     for (const o of g.centre) stroke(octx, o, k);
     octx.globalAlpha = 0.45;
     for (const o of g.dashed) stroke(octx, o, k);
+    // Pointer: a soft glow in the buffer makes nearby dots swell.
+    if (ptr.on > 0.01) {
+      octx.globalAlpha = 0.9 * ptr.on;
+      const gr = octx.createRadialGradient(ptr.x * k, ptr.y * k, 0, ptr.x * k, ptr.y * k, 120 * k);
+      gr.addColorStop(0, '#000');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      octx.fillStyle = gr;
+      octx.fillRect(0, 0, off.width, off.height);
+    }
     octx.globalAlpha = 1;
     octx.filter = 'none';
     const img = octx.getImageData(0, 0, off.width, off.height).data;
@@ -119,20 +156,24 @@ export function mountOrbitHalftone(opts: Opts) {
     dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     dctx.clearRect(0, 0, w, h);
     dctx.fillStyle = opts.dotColor;
-    const max = PITCH * 0.52;
+    const max = PITCH * 0.5;
+    const steps = new Set<number>();
     for (let y = PITCH / 2; y < h; y += PITCH) {
       for (let x = PITCH / 2; x < w; x += PITCH) {
         const ox = Math.min(off.width - 1, Math.floor(x / SCALE));
         const oy = Math.min(off.height - 1, Math.floor(y / SCALE));
         const a = img[(oy * off.width + ox) * 4 + 3] / 255;
-        const r = a > 0.02 ? max * Math.sqrt(a) : 0.55; // faint base grid everywhere
-        dctx.globalAlpha = a > 0.02 ? 1 : 0.35;
+        // Size follows intensity smoothly; a faint fine grid covers the rest.
+        const r = a > 0.02 ? 0.6 + (max - 0.6) * Math.pow(a, 0.85) : 0.5;
+        if (a > 0.02) steps.add(Math.round(r * 4));
+        dctx.globalAlpha = a > 0.02 ? 0.45 + 0.55 * a : 0.3;
         dctx.beginPath();
         dctx.arc(x, y, r, 0, TAU);
         dctx.fill();
       }
     }
     dctx.globalAlpha = 1;
+    dots.dataset.sizeSteps = String(steps.size);
 
     // 3. Crisp thin line art, markers and labels.
     if (lctx && lines) {
@@ -149,6 +190,27 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.setLineDash([2, 4]);
       for (const o of g.dashed) stroke(lctx, o);
       lctx.setLineDash([]);
+      // Thin latitude/longitude wireframe gives the sphere its form.
+      lctx.globalAlpha = 0.16;
+      lctx.lineWidth = 0.6;
+      for (const o of g.wire) stroke(lctx, o);
+      lines.dataset.wire = 'latlong';
+      // Dotted straight guides through the centre: axes and diagonals.
+      lctx.globalAlpha = 0.5;
+      lctx.setLineDash([1, 4]);
+      let dotted = 0;
+      for (const ang of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
+        const L = ang % (Math.PI / 2) === 0 ? g.R : g.R * 0.98;
+        lctx.beginPath();
+        lctx.moveTo(g.cx - Math.cos(ang) * L, g.cy - Math.sin(ang) * L);
+        lctx.lineTo(g.cx + Math.cos(ang) * L, g.cy + Math.sin(ang) * L);
+        lctx.stroke();
+        dotted++;
+      }
+      lctx.setLineDash([]);
+      lines.dataset.dotted = String(dotted);
+      lctx.lineWidth = 0.8;
+      lctx.globalAlpha = 0.55;
       // Ticks at the four cardinal points.
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         lctx.beginPath();
@@ -218,6 +280,14 @@ export function mountOrbitHalftone(opts: Opts) {
     (e) => {
       pose.ty = (e.clientX / window.innerWidth - 0.5) * 1.0;
       pose.tp = (e.clientY / window.innerHeight - 0.5) * 0.5;
+      const r = dots.getBoundingClientRect();
+      ptr.tx = e.clientX - r.left;
+      ptr.ty = e.clientY - r.top;
+      ptr.ton = 1;
+      if (ptr.x < -1000) {
+        ptr.x = ptr.tx;
+        ptr.y = ptr.ty;
+      }
     },
     { passive: true },
   );
@@ -230,6 +300,9 @@ export function mountOrbitHalftone(opts: Opts) {
     last = now;
     pose.yaw += (pose.ty - pose.yaw) * 0.08;
     pose.pitch += (pose.tp - pose.pitch) * 0.08;
+    ptr.x += (ptr.tx - ptr.x) * 0.2;
+    ptr.y += (ptr.ty - ptr.y) * 0.2;
+    ptr.on += (ptr.ton - ptr.on) * 0.1;
     draw(Math.max(0, (now - start) / 1000));
   };
   requestAnimationFrame(loop);

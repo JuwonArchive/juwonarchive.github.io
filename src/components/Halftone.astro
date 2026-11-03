@@ -16,7 +16,7 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
     mountOrbitHalftone({
       dots,
       lines,
-      dotColor: '#a9b4bf',
+      dotColor: '#c9d2db',
       lineColor: '#111111',
       labels: JSON.parse(lines?.dataset.tools ?? '[]'),
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -39,6 +39,6 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
   }
   .trace {
     z-index: 1;
-    opacity: 0.6;
+    opacity: 0.55;
   }
 </style>

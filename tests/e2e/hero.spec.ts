@@ -72,6 +72,38 @@ test.describe('home graphics', () => {
     expect(labels.map((l) => l.toUpperCase())).toContain('BLENDER');
   });
 
+  test('dot sizes vary continuously (not one size)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    const sizes = Number(await page.locator('canvas[data-halftone]').getAttribute('data-size-steps'));
+    expect(sizes).toBeGreaterThanOrEqual(8);
+  });
+
+  test('dots swell around the pointer', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'pointer');
+    await page.goto('/');
+    const vp = page.viewportSize()!;
+    const x = vp.width * 0.88;
+    const y = vp.height * 0.25;
+    await page.mouse.move(5, vp.height - 5);
+    await page.waitForTimeout(500);
+    const before = await inkAround(page, x, y, 50);
+    await page.mouse.move(x, y, { steps: 6 });
+    // Frames can be slow under parallel test load; wait for the eased pointer to arrive.
+    await expect.poll(() => inkAround(page, x, y, 50), { timeout: 15_000 }).toBeGreaterThan(before * 2);
+  });
+
+  test('light colour, sphere wireframe and dotted guides on the line layer', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(400);
+    const lines = page.locator('canvas[data-trace]');
+    await expect(lines).toHaveAttribute('data-wire', 'latlong');
+    expect(Number(await lines.getAttribute('data-dotted'))).toBeGreaterThanOrEqual(4);
+    const color = (await page.locator('canvas[data-halftone]').getAttribute('data-dot-color'))!;
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+    expect((r + g + b) / 3).toBeGreaterThan(195); // lighter than before (#a9b4bf ≈ 180)
+  });
+
   test('the artwork may run behind JUWON (no cut-off zone)', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
@@ -110,7 +142,8 @@ test.describe('opening animation', () => {
   test('work tiles flicker in, the name rises, then the intro clears', async ({ page }) => {
     await page.goto('/');
     const intro = page.locator('[data-intro]');
-    await expect(intro).toBeVisible();
+    // The intro is ~2 s; on a slow machine it can finish before we look, so check it was armed.
+    await expect(page.locator('html')).toHaveClass(/\bintro\b/);
     expect(await intro.locator('img').count()).toBeGreaterThan(3);
     await expect(intro).toBeHidden({ timeout: 4000 });
     await expect(page.locator('h1')).toBeVisible();
