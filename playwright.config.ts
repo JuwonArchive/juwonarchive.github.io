@@ -14,11 +14,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } } },
-    {
-      name: 'no-webgl',
-      testMatch: /hero\.spec\.ts/,
-      use: { browserName: 'chromium', viewport: { width: 1440, height: 900 }, launchOptions: { args: ['--disable-webgl', '--disable-3d-apis'] } },
-    },
     { name: 'mobile', use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
   ],
 });

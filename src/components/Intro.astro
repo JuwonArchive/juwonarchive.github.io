@@ -1,0 +1,105 @@
+---
+/**
+ * Opening animation (once per visit): tiles of the work flicker in around the centre,
+ * then the layer clears to reveal the home. Skipped with reduced motion.
+ */
+import type { SiteData } from '../lib/site-schema';
+
+interface Props {
+  site: SiteData;
+}
+const { site } = Astro.props;
+const images = [
+  ...site.works.flatMap((w) => (w.cover ? [w.cover.src] : [])),
+  ...site.works.flatMap((w) => w.blocks.flatMap((b) => (b.type === 'image' && b.media.height! <= b.media.width! * 2 ? [b.media.src] : []))),
+].slice(0, 12);
+// Fixed scatter (percent of viewport) around the centre, leaving the middle clear for the name.
+const spots = [
+  [18, 22], [38, 12], [64, 16], [82, 28], [86, 58], [70, 78], [46, 86], [22, 74], [10, 48], [30, 40], [72, 44], [54, 30],
+];
+---
+
+<div class="intro-layer" data-intro aria-hidden="true">
+  {
+    images.map((src, i) => (
+      <img
+        class="tile"
+        src={src}
+        alt=""
+        decoding="async"
+        style={`left:${spots[i % spots.length][0]}%;top:${spots[i % spots.length][1]}%;--d:${(i * 73) % 600}ms;--s:${0.7 + ((i * 37) % 6) / 10}`}
+      />
+    ))
+  }
+</div>
+
+<script is:inline>
+  // Decide before first paint so the intro never flashes for returning or reduced-motion visitors.
+  (function () {
+    try {
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce || sessionStorage.getItem('juwon-intro')) return;
+      sessionStorage.setItem('juwon-intro', '1');
+    } catch (e) {
+      /* storage blocked: still play once for this page view */
+    }
+    document.documentElement.classList.add('intro');
+  })();
+</script>
+
+<style is:global>
+  .intro-layer {
+    display: none;
+  }
+  html.intro .intro-layer {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: var(--bg);
+    pointer-events: none;
+    animation: intro-clear 500ms ease 1500ms forwards;
+  }
+  .intro-layer .tile {
+    position: absolute;
+    width: calc(clamp(56px, 9vw, 120px) * var(--s));
+    aspect-ratio: 1;
+    object-fit: cover;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    animation: tile-flicker 1100ms steps(1, end) var(--d) forwards;
+  }
+  /* The name rises letter by letter above the layer while it clears. */
+  html.intro .home h1 {
+    z-index: 40;
+  }
+  html.intro .home h1 .l {
+    display: inline-block;
+    animation: letter-rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(500ms + var(--i) * 70ms);
+  }
+  html.intro .home .bar,
+  html.intro .home .hero-slot {
+    animation: intro-fade 700ms ease 1600ms both;
+  }
+  @keyframes tile-flicker {
+    0% { opacity: 1; }
+    12% { opacity: 0; }
+    20% { opacity: 1; }
+    70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    78% { opacity: 0; }
+    86% { opacity: 1; transform: translate(-50%, -50%) scale(0.6); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  }
+  @keyframes intro-clear {
+    to { opacity: 0; visibility: hidden; }
+  }
+  @keyframes letter-rise {
+    from { opacity: 0; transform: translateY(40%); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes intro-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+</style>

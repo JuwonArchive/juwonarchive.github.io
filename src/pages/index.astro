@@ -1,14 +1,21 @@
 ---
 import Base from '../layouts/Base.astro';
-import ChromeHero from '../components/ChromeHero.astro';
+import Orbit from '../components/Orbit.astro';
+import Intro from '../components/Intro.astro';
 import { config } from '../config';
 import { longestWord } from '../lib/fit';
+import { loadSite } from '../data/load';
+
+const site = loadSite();
 ---
 
 <Base title={config.homeTitle}>
   <main class="home">
-    <div class="hero-slot" aria-hidden="true"><ChromeHero /></div>
-    <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`}>{config.headline}</h1>
+    <Intro site={site} />
+    <div class="hero-slot" aria-hidden="true"><Orbit works={site.works} /></div>
+    <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`} aria-label={config.headline}>
+      {[...config.headline].map((ch, i) => <span class="l" style={`--i:${i}`} aria-hidden="true">{ch}</span>)}
+    </h1>
     <div class="bar">
       <p class="mono subline" data-subline>{config.subline}</p>
       <nav class="ways" aria-label="Main" data-home-nav>
@@ -30,11 +37,13 @@ import { longestWord } from '../lib/fit';
     padding: var(--gutter);
     overflow: hidden;
   }
-  /* The artifact sits behind the name (user request). */
+  /* The diagram sits behind the name (user request). */
   .hero-slot {
     position: absolute;
     inset: 0;
     z-index: 0;
+    display: grid;
+    place-items: center;
     pointer-events: none;
   }
   .headline {
