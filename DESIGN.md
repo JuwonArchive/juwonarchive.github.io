@@ -1,10 +1,10 @@
 ---
 version: alpha
 name: JUWON-portfolio
-description: A bright, lab-like 3D gallery. Work sits on an off-white canvas that tints to soft pastels per project; a single oversized wide-black wordmark carries the page while a chrome 3D object floats over it. Interface chrome is reduced to small mono labels and white pill buttons so the 3D, AI-motion and graphic work speaks first. References — Belen Jones, Dirt, AREA Technology, UNVEIL, CLOU Architects.
+description: A bright, lab-like gallery. Work sits on a pure white canvas that tints to soft pastels per project; a single oversized wide-black wordmark carries the page while a chrome 3D object floats over it. Interface chrome is reduced to small mono labels and white pill buttons so the 3D, AI-motion and graphic work speaks first. References — Belen Jones, Dirt, AREA Technology, UNVEIL, CLOU Architects.
 
 colors:
-  canvas: "#F7F7F5"
+  canvas: "#FFFFFF"
   tint-lavender: "#E6E4F2"
   tint-mint: "#E3EEE8"
   tint-blush: "#F2E6E4"
@@ -77,7 +77,7 @@ object reflecting the work, not from decoration.
 ## Colors
 
 ### Surface
-- **Canvas** `#F7F7F5` — default page background. Never pure white; pure white is reserved for pills and cards so they lift off the canvas.
+- **Canvas** `#FFFFFF` — pure white page background. Pills and cards separate from it by their 1px hairline border, not by tone.
 - **Tints** `#E6E4F2` lavender, `#E3EEE8` mint, `#F2E6E4` blush, `#E4ECF2` sky — each work owns one tint (cycled in order). The page background crossfades to it on hover (400ms).
 - **Surface** `#FFFFFF` — pills, cards, placeholders.
 

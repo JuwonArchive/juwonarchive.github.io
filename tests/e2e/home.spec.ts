@@ -32,3 +32,10 @@ test.describe('home (depth 0)', () => {
     await expectNoHorizontalScroll(page);
   });
 });
+
+test('page background is pure white', async ({ page }) => {
+  for (const path of ['/', '/archive', '/info']) {
+    await page.goto(path);
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(255, 255, 255)');
+  }
+});

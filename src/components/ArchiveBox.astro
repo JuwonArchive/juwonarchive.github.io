@@ -77,10 +77,13 @@ const num = String(index + 1).padStart(2, '0');
     top: 50%;
     display: block;
   }
+  /* On a pure white page the glass needs a faint cool tint and hairline edges to read as a box. */
   .f {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18) 45%, rgba(255, 255, 255, 0.4));
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.6);
+    background: linear-gradient(135deg, rgba(232, 236, 245, 0.55), rgba(214, 221, 236, 0.22) 45%, rgba(236, 240, 248, 0.5));
+    border: 1px solid rgba(40, 52, 90, 0.16);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+      inset 0 0 18px rgba(255, 255, 255, 0.7);
   }
   .front {
     width: var(--W);
