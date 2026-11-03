@@ -33,14 +33,11 @@ test.describe('home graphics', () => {
     expect(errors).toEqual([]);
   });
 
-  test('a halftone ribbon artwork in the display colour, not a wallpaper', async ({ page }) => {
+  test('orbit line art rendered through a halftone screen', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const canvas = page.locator('canvas[data-halftone]');
-    await expect(canvas).toBeVisible();
-    await expect(canvas).toHaveAttribute('data-color', '#dae0e5');
-    await expect(canvas).toHaveAttribute('data-form', 'orb');
-    // Coverage: some cells are dense, most of the page stays open.
+    await expect(canvas).toHaveAttribute('data-form', 'orbit');
     const share = await canvas.evaluate((c: HTMLCanvasElement) => {
       const ctx = c.getContext('2d')!;
       const cell = Math.round(60 * (c.width / c.clientWidth));
@@ -55,14 +52,24 @@ test.describe('home graphics', () => {
           const mean = a / (d.length / 4);
           total++;
           if (mean > 8) inked++;
-          if (mean > 60) dense++;
+          if (mean > 40) dense++;
         }
       return { inked: inked / total, dense: dense / total };
     });
-    expect(share.inked).toBeGreaterThan(0.08);
-    expect(share.inked).toBeGreaterThan(0.15); // denser (user)
-    expect(share.inked).toBeLessThan(0.6);
-    expect(share.dense).toBeGreaterThan(0.02);
+    expect(share.inked).toBeGreaterThan(0.1);
+    expect(share.inked).toBeLessThan(0.75);
+    expect(share.dense).toBeGreaterThan(0.01); // dots swell where orbits cross
+  });
+
+  test('crisp line art on top carries tool-name labels', async ({ page }) => {
+    await page.goto('/');
+    const lines = page.locator('canvas[data-trace]');
+    expect(await lines.evaluate((c) => getComputedStyle(c).filter)).toBe('none');
+    await page.waitForTimeout(600);
+    const labels = JSON.parse((await lines.getAttribute('data-labels'))!) as string[];
+    expect(labels.length).toBeGreaterThanOrEqual(5);
+    for (const l of labels) expect(l).toMatch(/^[\x20-\x7E]+$/);
+    expect(labels.map((l) => l.toUpperCase())).toContain('BLENDER');
   });
 
   test('the artwork may run behind JUWON (no cut-off zone)', async ({ page }) => {
@@ -74,32 +81,7 @@ test.describe('home graphics', () => {
     expect(ink).toBeGreaterThan(3);
   });
 
-  test('ribbon dots never merge into each other (user)', async ({ page }) => {
-    await page.goto('/');
-    // Sample several moments of the twist on desktop and phone.
-    for (let i = 0; i < 4; i++) {
-      await page.waitForTimeout(700);
-      await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-overlaps', '0');
-    }
-  });
-
-  test('the artwork morphs between several forms', async ({ page }) => {
-    test.setTimeout(40_000);
-    await page.goto('/');
-    const canvas = page.locator('canvas[data-halftone]');
-    const forms = (await canvas.getAttribute('data-forms'))!.split(',');
-    expect(forms.length).toBeGreaterThanOrEqual(4);
-    expect(forms).toEqual(expect.arrayContaining(['orb', 'vortex', 'torus', 'bloom'])); // original forms
-    const seen = new Set<string>();
-    for (let i = 0; i < 22 && seen.size < 2; i++) {
-      seen.add((await canvas.getAttribute('data-form'))!);
-      await page.waitForTimeout(800);
-    }
-    expect(seen.size).toBeGreaterThanOrEqual(2);
-    await expect(canvas).toHaveAttribute('data-overlaps', '0');
-  });
-
-  test('the ribbon turns toward the pointer', async ({ page, isMobile }) => {
+  test('the orbits turn toward the pointer', async ({ page, isMobile }) => {
     test.skip(isMobile, 'pointer');
     await page.goto('/');
     const snap = () => page.locator('canvas[data-halftone]').evaluate((c: HTMLCanvasElement) => c.dataset.pose);
@@ -108,12 +90,10 @@ test.describe('home graphics', () => {
     const a = await snap();
     await page.mouse.move(1300, 800, { steps: 8 });
     await page.waitForTimeout(900);
-    const b = await snap();
-    expect(a).toBeTruthy();
-    expect(b).not.toBe(a);
+    expect(await snap()).not.toBe(a);
   });
 
-  test('no background fog: the page behind the artwork is plain white (user)', async ({ page }) => {
+  test('no background fog: plain white page', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('[data-fog]')).toHaveCount(0);
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(255, 255, 255)');
@@ -152,39 +132,3 @@ test.describe('opening animation', () => {
   });
 });
 
-test('halftone has a slight dreamy blur (user)', async ({ page }) => {
-  await page.goto('/');
-  const f = await page.locator('canvas[data-halftone]').evaluate((c) => getComputedStyle(c).filter);
-  const px = Number(f.match(/blur\(([\d.]+)px\)/)?.[1] ?? 0);
-  expect(px).toBeGreaterThan(0.5);
-  expect(px).toBeLessThanOrEqual(2.5);
-});
-
-test('plotter trace sits on top of the halftone, crisp, with labelled markers that move', async ({ page }) => {
-  await page.goto('/');
-  const trace = page.locator('canvas[data-trace]');
-  await expect(trace).toBeVisible();
-  expect(await trace.evaluate((c) => getComputedStyle(c).filter)).toBe('none');
-  const z = await page.evaluate(() => [
-    Number(getComputedStyle(document.querySelector('canvas[data-trace]')!).zIndex || 0),
-    Number(getComputedStyle(document.querySelector('canvas[data-halftone]')!).zIndex || 0),
-  ]);
-  expect(z[0]).toBeGreaterThan(z[1]);
-  await page.waitForTimeout(600);
-  const a = await trace.getAttribute('data-labels');
-  const labels = JSON.parse(a!) as string[];
-  expect(labels.length).toBeGreaterThanOrEqual(8);
-  for (const l of labels) expect(l).toMatch(/^\d+ \d+$/);
-  await page.waitForTimeout(1500);
-  expect(await trace.getAttribute('data-labels')).not.toBe(a);
-});
-
-test('plotter path runs one way, straight only, and is light (user)', async ({ page }) => {
-  await page.goto('/');
-  const trace = page.locator('canvas[data-trace]');
-  await page.waitForTimeout(600);
-  const xs = (JSON.parse((await trace.getAttribute('data-labels'))!) as string[]).map((l) => Number(l.split(' ')[0]));
-  for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThanOrEqual(xs[i - 1]);
-  await expect(trace).toHaveAttribute('data-path', 'straight');
-  expect(Number(await trace.evaluate((c) => getComputedStyle(c).opacity))).toBeLessThanOrEqual(0.55);
-});

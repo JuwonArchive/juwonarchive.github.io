@@ -1,43 +1,44 @@
 ---
-/** Dense halftone dots in the display colour, filling the page behind the name. */
+/** Home artwork: 3D orbital line art read through a halftone screen, with crisp labelled line art on top. */
+import { loadSite } from '../data/load';
+const ascii = (t: string) => /^[\x20-\x7E]+$/.test(t);
+const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))].slice(0, 9);
 ---
 
-<canvas class="halftone" data-halftone data-color="#dae0e5" aria-hidden="true"></canvas>
-<canvas class="trace" data-trace aria-hidden="true"></canvas>
+<canvas class="halftone" data-halftone aria-hidden="true"></canvas>
+<canvas class="trace" data-trace data-tools={JSON.stringify(tools)} aria-hidden="true"></canvas>
 
 <script>
-  import { mountHalftone } from '../scripts/halftone';
-  const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
-  if (canvas) {
-    const pitch = window.matchMedia('(max-width: 767px)').matches ? 10 : 13;
-    canvas.dataset.pitch = String(pitch);
-    mountHalftone(canvas, {
-      color: canvas.dataset.color ?? '#dae0e5',
-      pitch,
+  import { mountOrbitHalftone } from '../scripts/orbit-halftone';
+  const dots = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
+  const lines = document.querySelector<HTMLCanvasElement>('canvas[data-trace]');
+  if (dots) {
+    mountOrbitHalftone({
+      dots,
+      lines,
+      dotColor: '#a9b4bf',
+      lineColor: '#111111',
+      labels: JSON.parse(lines?.dataset.tools ?? '[]'),
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      trace: document.querySelector<HTMLCanvasElement>('canvas[data-trace]'),
-      traceColor: '#111111',
     });
   }
 </script>
 
 <style>
+  .halftone,
+  .trace {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  /* Soft halftone (like a screen print) under a crisp line drawing. */
   .halftone {
     z-index: 0;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    /* Slight blur plus a soft glow of the same dots: dreamy, still readable as halftone. */
-    filter: blur(1.4px) drop-shadow(0 0 6px rgba(218, 224, 229, 0.9));
+    filter: blur(0.8px);
   }
-  /* Crisp plotter overlay above the blurred dots. */
   .trace {
-    opacity: 0.45;
-    position: absolute;
-    inset: 0;
     z-index: 1;
-    width: 100%;
-    height: 100%;
+    opacity: 0.6;
   }
 </style>
