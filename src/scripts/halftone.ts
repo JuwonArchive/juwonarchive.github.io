@@ -109,6 +109,34 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
         pts.push({ x: cx + x * size * persp, y: cy + y * size * persp, z, r: maxR * facing * edge * ends * persp });
       }
     }
+    // Keep every dot clear of its grid neighbours on screen, so pinched or edge-on parts of the
+    // ribbon stay dotted instead of merging into a solid band.
+    const at = (i: number, j: number) => pts[i * NV + j];
+    const GAP = 0.42;
+    for (let i = 0; i < NU; i++)
+      for (let j = 0; j < NV; j++) {
+        const p = at(i, j);
+        let nearest = Infinity;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const q = i + di >= 0 && i + di < NU && j + dj >= 0 && j + dj < NV ? at(i + di, j + dj) : null;
+          if (q) nearest = Math.min(nearest, Math.hypot(p.x - q.x, p.y - q.y));
+        }
+        p.r = Math.min(p.r, nearest * GAP);
+      }
+    let overlaps = 0;
+    for (let i = 0; i < NU; i++)
+      for (let j = 0; j < NV; j++) {
+        const p = at(i, j);
+        if (i + 1 < NU) {
+          const q = at(i + 1, j);
+          if (p.r + q.r > Math.hypot(p.x - q.x, p.y - q.y) + 0.01) overlaps++;
+        }
+        if (j + 1 < NV) {
+          const q = at(i, j + 1);
+          if (p.r + q.r > Math.hypot(p.x - q.x, p.y - q.y) + 0.01) overlaps++;
+        }
+      }
+    canvas.dataset.overlaps = String(overlaps);
     pts.sort((a, b) => a.z - b.z);
     for (const p of pts) dot(p.x, p.y, p.r);
   };

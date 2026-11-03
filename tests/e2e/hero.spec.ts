@@ -66,6 +66,15 @@ test.describe('home graphics', () => {
     }
   });
 
+  test('ribbon dots never merge into each other (user)', async ({ page }) => {
+    await page.goto('/');
+    // Sample several moments of the twist on desktop and phone.
+    for (let i = 0; i < 4; i++) {
+      await page.waitForTimeout(700);
+      await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-overlaps', '0');
+    }
+  });
+
   test('the ribbon turns toward the pointer', async ({ page, isMobile }) => {
     test.skip(isMobile, 'pointer');
     await page.goto('/');
