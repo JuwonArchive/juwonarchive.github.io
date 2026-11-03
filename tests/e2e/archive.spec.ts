@@ -53,3 +53,24 @@ test.describe('archive (depth 1)', () => {
     await expect(page).toHaveURL(/\/archive\/?$/);
   });
 });
+
+test.describe('opening a box', () => {
+  test('the lid opens and the view dives in before the page changes', async ({ page }) => {
+    await page.goto('/archive');
+    const box = page.locator('a[data-archive-box]').nth(1);
+    await box.click();
+    await expect(box).toHaveAttribute('data-opening', '');
+    await expect(page.locator('[data-dive]')).toHaveAttribute('data-active', '');
+    await expect(page).toHaveURL(new RegExp(`/archive/${site.works[1].slug}/?$`), { timeout: 5000 });
+    // The item page arrives out of the same tint.
+    await expect(page.locator('[data-arrive]')).toHaveCount(1);
+  });
+
+  test('reduced motion skips the dive and goes straight in', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/archive');
+    const box = page.locator('a[data-archive-box]').nth(1);
+    await box.click();
+    await expect(page).toHaveURL(new RegExp(`/archive/${site.works[1].slug}/?$`), { timeout: 1500 });
+  });
+});

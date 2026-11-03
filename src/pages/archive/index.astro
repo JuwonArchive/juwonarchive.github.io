@@ -26,8 +26,33 @@ const { works } = loadSite();
       }
     </ul>
   </main>
+  <div class="dive" data-dive aria-hidden="true"></div>
   <Footer slot="footer" />
 </Base>
+
+<script>
+  // Click a box: lid opens, view dives in, screen fills with the box tint, then the page changes.
+  const DIVE_MS = 850;
+  const dive = document.querySelector<HTMLElement>('[data-dive]');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  for (const box of document.querySelectorAll<HTMLAnchorElement>('a[data-archive-box]')) {
+    box.addEventListener('click', (e) => {
+      if (reduce.matches || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      e.preventDefault();
+      if (box.hasAttribute('data-opening')) return;
+      box.toggleAttribute('data-opening', true);
+      dive?.style.setProperty('--dive-tint', box.style.getPropertyValue('--tint'));
+      dive?.toggleAttribute('data-active', true);
+      window.setTimeout(() => (window.location.href = box.href), DIVE_MS);
+    });
+  }
+  // Coming back with the browser's back button restores the page from cache: reset it.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    document.querySelectorAll('[data-opening]').forEach((el) => el.removeAttribute('data-opening'));
+    dive?.removeAttribute('data-active');
+  });
+</script>
 
 <style>
   .archive {
@@ -57,6 +82,18 @@ const { works } = loadSite();
     grid-template-columns: repeat(var(--n), minmax(0, var(--box-w)));
     justify-content: center;
     gap: clamp(16px, 4vw, 64px);
+  }
+  .dive {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--dive-tint, var(--bg));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 450ms ease 380ms;
+  }
+  .dive[data-active] {
+    opacity: 1;
   }
   @media (max-width: 767px) {
     .shelf {

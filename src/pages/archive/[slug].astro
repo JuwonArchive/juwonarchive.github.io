@@ -84,6 +84,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
       <a class="pill" href={`/archive/${next.slug}`}>NEXT →</a>
     </nav>
   </main>
+  <div class="arrive" data-arrive aria-hidden="true"></div>
   <Footer slot="footer" />
 </Base>
 
@@ -170,6 +171,26 @@ const pad = (n: number) => String(n).padStart(2, '0');
   .section-title {
     margin: 0;
     color: var(--muted);
+  }
+  /* Continues the dive from the archive: the page emerges out of the box tint. */
+  .arrive {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--tint);
+    pointer-events: none;
+    animation: emerge 700ms ease 80ms both;
+  }
+  @keyframes emerge {
+    to {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .arrive {
+      display: none;
+    }
   }
   .pager {
     display: flex;

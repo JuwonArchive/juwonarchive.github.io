@@ -12,6 +12,7 @@ const { work, index, tint } = Astro.props;
 <a class="box" href={`/archive/${work.slug}`} data-archive-box style={`--tint:${tint}`}>
   <span class="scene" aria-hidden="true">
     <span class="cube">
+      <span class="face floor"></span>
       <span class="face lid"></span>
       <span class="face side"></span>
       <span class="face front">
@@ -117,12 +118,34 @@ const { work, index, tint } = Astro.props;
     background: linear-gradient(100deg, #ffffff 0%, #c9ccd1 30%, #f8f9fa 52%, #9ea1a7 80%, #e8eaed 100%);
     transition: transform 600ms var(--ease);
   }
-  .box:hover .cube,
-  .box:focus-visible .cube {
+  .floor {
+    width: var(--W);
+    height: var(--D);
+    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / -2 + 1px));
+    background: radial-gradient(circle at 50% 50%, #3a3c40, #151618 75%);
+  }
+  /* Opening: the lid flies off and the view drops into the box. */
+  .box[data-opening] .cube {
+    transition: transform 900ms cubic-bezier(0.6, 0, 0.2, 1);
+    transform: rotateX(-82deg) rotateY(0deg) scale(3.2);
+  }
+  .box[data-opening] .lid {
+    transition:
+      transform 500ms var(--ease),
+      opacity 400ms ease 150ms;
+    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2 + 70cqw)) rotateY(25deg);
+    opacity: 0;
+  }
+  .box[data-opening] .label {
+    opacity: 0;
+    transition: opacity 200ms;
+  }
+  .box:not([data-opening]):hover .cube,
+  .box:not([data-opening]):focus-visible .cube {
     transform: rotateX(-12deg) rotateY(-18deg) translateY(-6px);
   }
-  .box:hover .lid,
-  .box:focus-visible .lid {
+  .box:not([data-opening]):hover .lid,
+  .box:not([data-opening]):focus-visible .lid {
     transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2 + 12px));
   }
   .label {
