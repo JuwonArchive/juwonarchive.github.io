@@ -114,3 +114,21 @@ test.describe('core sphere', () => {
     expect(await page.locator('[data-orbit]').evaluate((svg: SVGSVGElement) => svg.animationsPaused())).toBe(true);
   });
 });
+
+test('the white crescent reaches well into the sphere (user: stronger white light)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'measured once at desktop size');
+  const { createRequire } = await import('node:module');
+  const sharp = createRequire(import.meta.url)('sharp');
+  await page.emulateMedia({ reducedMotion: 'reduce' }); // freeze the bands so the measurement is stable
+  await page.goto('/');
+  const box = (await page.locator('[data-sphere] [data-body]').boundingBox())!;
+  const r = box.width / 2;
+  const at = async (dx: number, dy: number) => {
+    const buf = await page.screenshot({ clip: { x: box.x + r + dx * r - 6, y: box.y + r + dy * r - 6, width: 12, height: 12 } });
+    const st = await sharp(buf).stats();
+    return (st.channels[0].mean + st.channels[1].mean + st.channels[2].mean) / 3;
+  };
+  expect(await at(0.22, -0.3)).toBeGreaterThanOrEqual(215);
+  // The rest of the sphere stays blue.
+  expect(await at(-0.2, 0.2)).toBeLessThan(200);
+});
