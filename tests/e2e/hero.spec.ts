@@ -178,3 +178,13 @@ test('plotter trace sits on top of the halftone, crisp, with labelled markers th
   await page.waitForTimeout(1500);
   expect(await trace.getAttribute('data-labels')).not.toBe(a);
 });
+
+test('plotter path runs one way, straight only, and is light (user)', async ({ page }) => {
+  await page.goto('/');
+  const trace = page.locator('canvas[data-trace]');
+  await page.waitForTimeout(600);
+  const xs = (JSON.parse((await trace.getAttribute('data-labels'))!) as string[]).map((l) => Number(l.split(' ')[0]));
+  for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThanOrEqual(xs[i - 1]);
+  await expect(trace).toHaveAttribute('data-path', 'straight');
+  expect(Number(await trace.evaluate((c) => getComputedStyle(c).opacity))).toBeLessThanOrEqual(0.55);
+});

@@ -148,7 +148,7 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
 
   /**
    * Plotter overlay: a dozen dots picked along the artwork, marked ○ □ △ with their screen
-   * coordinates, joined by straight segments and threaded by one smooth curve.
+   * coordinates, joined left to right by straight segments.
    */
   const MARKS = 12;
   const plot = () => {
@@ -165,28 +165,19 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
         }
       }
     }
+    // One direction: left to right.
+    picks.sort((a, b) => a.x - b.x);
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     tctx.clearRect(0, 0, w, h);
     tctx.strokeStyle = tctx.fillStyle = opts.traceColor ?? '#111';
     tctx.lineWidth = 1;
     tctx.font = '10px "Geist Mono Variable", ui-monospace, monospace';
     if (picks.length < 2) return void (opts.trace.dataset.labels = '[]');
-    // Straight segments.
-    tctx.globalAlpha = 0.55;
+    // Straight segments only.
+    opts.trace.dataset.path = 'straight';
+    tctx.globalAlpha = 1;
     tctx.beginPath();
     picks.forEach((p, i) => (i ? tctx.lineTo(p.x, p.y) : tctx.moveTo(p.x, p.y)));
-    tctx.stroke();
-    // Smooth curve through the same points (Catmull-Rom as Béziers).
-    tctx.globalAlpha = 0.9;
-    tctx.beginPath();
-    tctx.moveTo(picks[0].x, picks[0].y);
-    for (let i = 0; i < picks.length - 1; i++) {
-      const p0 = picks[Math.max(0, i - 1)];
-      const p1 = picks[i];
-      const p2 = picks[i + 1];
-      const p3 = picks[Math.min(picks.length - 1, i + 2)];
-      tctx.bezierCurveTo(p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6, p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6, p2.x, p2.y);
-    }
     tctx.stroke();
     // Markers and coordinate labels.
     tctx.globalAlpha = 1;
