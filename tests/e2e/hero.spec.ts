@@ -80,29 +80,15 @@ test.describe('home graphics', () => {
     expect(b).not.toBe(a);
   });
 
-  test('fog of the four palette colours drifts and follows the pointer', async ({ page, isMobile }) => {
+  test('no background fog: the page behind the artwork is plain white (user)', async ({ page }) => {
     await page.goto('/');
-    const layers = page.locator('[data-fog] [data-fog-layer]');
-    expect(await layers.count()).toBe(4);
-    const colours = await layers.evaluateAll((els) => els.map((e) => e.getAttribute('data-fog-layer')));
-    expect(new Set(colours)).toEqual(new Set(['#f0faff', '#49c2ff', '#4963fd', '#443be3']));
-    expect(await layers.first().evaluate((el) => getComputedStyle(el).animationName)).not.toBe('none');
-    if (!isMobile) {
-      const fog = page.locator('[data-fog]');
-      await page.mouse.move(10, 10);
-      await page.waitForTimeout(600);
-      const a = await fog.evaluate((el) => getComputedStyle(el).getPropertyValue('--mx'));
-      await page.mouse.move(1200, 700, { steps: 6 });
-      await page.waitForTimeout(600);
-      const b = await fog.evaluate((el) => getComputedStyle(el).getPropertyValue('--mx'));
-      expect(a).not.toBe(b);
-    }
+    await expect(page.locator('[data-fog]')).toHaveCount(0);
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(255, 255, 255)');
   });
 
   test('everything holds still with reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    expect(await page.locator('[data-fog] [data-fog-layer]').first().evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
     await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-static', '');
   });
 });

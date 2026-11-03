@@ -1,7 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
 import Halftone from '../components/Halftone.astro';
-import Fog from '../components/Fog.astro';
 import Intro from '../components/Intro.astro';
 import { config } from '../config';
 import { longestWord } from '../lib/fit';
@@ -13,7 +12,6 @@ const site = loadSite();
 <Base title={config.homeTitle}>
   <main class="home">
     <Intro site={site} />
-    <Fog />
     <div class="hero-slot" aria-hidden="true"><Halftone /></div>
     <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`} aria-label={config.headline}>
       {[...config.headline].map((ch, i) => <span class="l" style={`--i:${i}`} aria-hidden="true">{ch}</span>)}
@@ -39,7 +37,7 @@ const site = loadSite();
     padding: var(--gutter);
     overflow: hidden;
   }
-  /* Halftone behind the name, above the fog. */
+  /* Halftone behind the name. */
   .hero-slot {
     position: absolute;
     inset: 0;

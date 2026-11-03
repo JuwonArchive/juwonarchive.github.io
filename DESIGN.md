@@ -174,4 +174,4 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 
 - Display words (JUWON, ARCHIVE, INFO, work titles) use **Display `#DAE0E5`**, a pale cool grey. Small text stays readable in **Ink `#1D2430`** (blue-black) and **Muted `#7B8794`**.
 - Tints are icy (ice, frost, mist, steel). No warm tones anywhere.
-- The only saturated colour is the **signal palette** in the home disc: `#F0FAFF → #49C2FF → #4963FD → #443BE3`, a flat radial gradient with ripples spreading from the centre, labelled `JW / SIGNAL · 04`.
+- Home artwork: a single twisted halftone ribbon in Display `#DAE0E5` on plain white, with faint dotted arcs in two corners. No background colour or fog.
