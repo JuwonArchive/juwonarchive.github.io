@@ -2,6 +2,7 @@
 import type { Block } from '../lib/site-schema';
 import RichText from './RichText.astro';
 import { igCrop } from '../lib/ig-crop';
+import CropMarks from './CropMarks.astro';
 
 interface Props {
   blocks: Block[];
@@ -60,6 +61,7 @@ const isFirstImage = () => {
           const tall = !!(b.media.width && b.media.height && b.media.height > b.media.width * 2);
           return (
             <figure class="b-media">
+              <CropMarks>
               <a
                 class="frame"
                 data-frame
@@ -81,6 +83,7 @@ const isFirstImage = () => {
                 />
                 {tall && <span class="mono view-full">VIEW FULL ↗</span>}
               </a>
+              </CropMarks>
               {(b.caption || b.source) && (
                 <figcaption class="mono">
                   {b.caption && <RichText text={b.caption} />}
@@ -97,9 +100,11 @@ const isFirstImage = () => {
         case 'video':
           return (
             <figure class="b-media">
-              <div class="frame" data-frame>
-                <video src={b.media.src} muted playsinline loop controls preload="metadata" data-inview-play />
-              </div>
+              <CropMarks>
+                <div class="frame" data-frame>
+                  <video src={b.media.src} muted playsinline loop controls preload="metadata" data-inview-play />
+                </div>
+              </CropMarks>
               {(b.caption || b.source) && (
                 <figcaption class="mono">
                   {b.caption && <RichText text={b.caption} />}
@@ -127,6 +132,7 @@ const isFirstImage = () => {
           const sizedInstagram = b.provider === 'instagram' && b.aspect;
           return (
             <figure class={`b-embed b-embed--${b.provider}`}>
+              <CropMarks>
               {sizedInstagram ? (
                 <div class="frame" data-frame>
                   <div
@@ -144,6 +150,7 @@ const isFirstImage = () => {
                   {iframe}
                 </div>
               )}
+              </CropMarks>
               <figcaption class="mono">
                 <a href={b.url} target="_blank" rel="noopener">
                   OPEN ON {b.provider.toUpperCase()} ↗

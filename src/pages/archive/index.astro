@@ -1,0 +1,68 @@
+---
+import Base from '../../layouts/Base.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import ArchiveBox from '../../components/ArchiveBox.astro';
+import { loadSite } from '../../data/load';
+import { config } from '../../config';
+
+const { works } = loadSite();
+---
+
+<Base title="ARCHIVE — JUWON" description="Archive of 3D, AI-generated and graphic work by JUWON.">
+  <Nav slot="header" current="archive" />
+  <main class="archive">
+    <div class="title">
+      <h1 class="display">ARCHIVE</h1>
+      <span class="mono count" aria-label={`${works.length} archives`}>{String(works.length).padStart(2, '0')}</span>
+    </div>
+    <ul class="shelf" style={`--n:${works.length}`}>
+      {
+        works.map((w, i) => (
+          <li>
+            <ArchiveBox work={w} index={i} tint={config.pastels[i % config.pastels.length]} />
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+  <Footer slot="footer" />
+</Base>
+
+<style>
+  .archive {
+    min-height: calc(100svh - 60px);
+    display: flex;
+    flex-direction: column;
+    padding: 96px var(--gutter) 32px;
+  }
+  .title {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .title h1 {
+    font-size: clamp(48px, 12vw, 200px);
+    margin-left: -0.04em;
+  }
+  .count {
+    padding-top: 0.4em;
+  }
+  .shelf {
+    --box-w: min(20vw, 260px);
+    list-style: none;
+    margin: auto 0;
+    padding: 48px 0;
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, var(--box-w)));
+    justify-content: center;
+    gap: clamp(16px, 4vw, 64px);
+  }
+  @media (max-width: 767px) {
+    .shelf {
+      --box-w: 42vw;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 32px 16px;
+    }
+  }
+</style>

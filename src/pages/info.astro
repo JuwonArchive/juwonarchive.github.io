@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import { loadSite } from '../data/load';
+import { config } from '../config';
 
 const { experience, skills, contact } = loadSite();
 const groups = [
@@ -12,10 +13,11 @@ const groups = [
 ];
 ---
 
-<Base title="ABOUT — JUWON" description="Experience, tools and contact for JUWON — 3D, AI and graphic designer based in Ilsan, Korea.">
-  <Nav slot="header" current="about" />
+<Base title="INFO — JUWON" description="Experience, tools and contact for JUWON — 3D, AI and graphic designer based in Ilsan, Korea.">
+  <Nav slot="header" current="info" />
   <main class="about">
-    <h1 class="display title">ABOUT</h1>
+    <h1 class="display title">INFO</h1>
+    <p class="mono lede">{config.subline}</p>
 
     <section class="row">
       <h2 class="mono label">EXPERIENCE</h2>
@@ -79,7 +81,11 @@ const groups = [
   }
   .title {
     font-size: clamp(48px, 12vw, 200px);
-    margin: 0 0 clamp(48px, 8vw, 96px) -0.04em;
+    margin: 0 0 16px -0.04em;
+  }
+  .lede {
+    margin: 0 0 clamp(48px, 8vw, 96px);
+    color: var(--muted);
   }
   .row {
     display: grid;

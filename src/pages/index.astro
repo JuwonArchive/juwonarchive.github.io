@@ -1,70 +1,66 @@
 ---
 import Base from '../layouts/Base.astro';
-import Nav from '../components/Nav.astro';
-import Footer from '../components/Footer.astro';
-import CategoryList from '../components/CategoryList.astro';
 import ChromeHero from '../components/ChromeHero.astro';
 import { config } from '../config';
-import { loadSite } from '../data/load';
 import { longestWord } from '../lib/fit';
-
-const site = loadSite();
 ---
 
 <Base title={config.homeTitle}>
-  <Nav slot="header" />
-  <main>
-    <section class="hero">
-      <div id="hero-slot" class="hero-slot" aria-hidden="true"><ChromeHero /></div>
-      <div class="hero-text">
-        <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`}>{config.headline}</h1>
-        <p class="mono subline" data-subline>{config.subline}</p>
-      </div>
-    </section>
-    <section class="works" aria-labelledby="works-label">
-      <h2 id="works-label" class="mono label">SELECTED WORKS</h2>
-      <CategoryList works={site.works} />
-    </section>
+  <main class="home">
+    <div class="hero-slot" aria-hidden="true"><ChromeHero /></div>
+    <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`}>{config.headline}</h1>
+    <div class="bar">
+      <p class="mono subline" data-subline>{config.subline}</p>
+      <nav class="ways" aria-label="Main" data-home-nav>
+        <a class="pill" href="/archive">ARCHIVE</a>
+        <a class="pill" href="/info">INFO</a>
+      </nav>
+    </div>
   </main>
-  <Footer slot="footer" />
 </Base>
 
 <style>
-  .hero {
+  .home {
     position: relative;
-    min-height: 100svh;
+    height: 100svh;
+    min-height: 480px;
     display: flex;
-    align-items: flex-end;
-    padding: 0 var(--gutter) clamp(24px, 4vw, 48px);
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: var(--gutter);
+    overflow: hidden;
   }
   .hero-slot {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 1;
     pointer-events: none;
   }
-  .hero-text {
+  .headline {
     position: relative;
     z-index: 0;
-    width: 100%;
-  }
-  .headline {
     /* JUWON's W and O are wider than average, so budget ~0.98em per glyph. */
     --fit-max: 360px;
     --fit-width: (100vw - 2 * var(--gutter)) * 0.86 / 0.98;
     margin-left: -0.04em;
   }
-  .subline {
-    margin: 16px 0 0;
-  }
-  .works {
+  .bar {
     position: relative;
     z-index: 2;
-    padding: clamp(48px, 10vw, 140px) 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
   }
-  .label {
-    margin: 0 var(--gutter) 16px;
-    color: var(--muted);
-    font-weight: 400;
+  .subline {
+    margin: 0;
+    max-width: 60ch;
+  }
+  .ways {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
   }
 </style>

@@ -30,19 +30,6 @@ test.describe('chrome hero', () => {
     expect(a.equals(b)).toBe(true);
   });
 
-  test('reflects the hovered work cover', async ({ page, isMobile }, info) => {
-    test.skip(isMobile || info.project.name === 'no-webgl');
-    await page.goto('/');
-    const canvas = page.locator('canvas#chrome-hero');
-    await expect(canvas).toHaveAttribute('data-ready', '');
-    const i = site.works.findIndex((w) => w.cover);
-    test.skip(i < 0, 'no covers in Notion');
-    await page.locator('[data-category-item]').nth(i).hover();
-    await expect(canvas).toHaveAttribute('data-reflection', site.works[i].cover!.src);
-    await page.mouse.move(5, 5);
-    await expect(canvas).toHaveAttribute('data-reflection', '');
-  });
-
   test('falls back to a still image without WebGL', async ({ page }, info) => {
     test.skip(info.project.name !== 'no-webgl');
     const errors = trackErrors(page);

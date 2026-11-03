@@ -1,0 +1,55 @@
+---
+/** Print-style crop marks (ㄱ corners) just outside a media frame. */
+---
+
+<div class="framed" data-cropmarks>
+  <slot />
+  <i class="cm tl" aria-hidden="true"></i><i class="cm tr" aria-hidden="true"></i><i class="cm bl" aria-hidden="true"></i><i
+    class="cm br"
+    aria-hidden="true"></i>
+</div>
+
+<style>
+  .framed {
+    position: relative;
+  }
+  .cm {
+    --len: 14px;
+    --gap: 8px;
+    position: absolute;
+    width: var(--len);
+    height: var(--len);
+    border: 0 solid var(--muted);
+    pointer-events: none;
+  }
+  .tl {
+    top: calc(-1 * var(--gap));
+    left: calc(-1 * var(--gap));
+    border-top-width: 1px;
+    border-left-width: 1px;
+  }
+  .tr {
+    top: calc(-1 * var(--gap));
+    right: calc(-1 * var(--gap));
+    border-top-width: 1px;
+    border-right-width: 1px;
+  }
+  .bl {
+    bottom: calc(-1 * var(--gap));
+    left: calc(-1 * var(--gap));
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+  }
+  .br {
+    bottom: calc(-1 * var(--gap));
+    right: calc(-1 * var(--gap));
+    border-bottom-width: 1px;
+    border-right-width: 1px;
+  }
+  @media (max-width: 767px) {
+    .cm {
+      --len: 10px;
+      --gap: 5px;
+    }
+  }
+</style>

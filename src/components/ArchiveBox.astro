@@ -1,0 +1,136 @@
+---
+import type { Work } from '../lib/site-schema';
+
+interface Props {
+  work: Work;
+  index: number;
+  tint: string;
+}
+const { work, index, tint } = Astro.props;
+---
+
+<a class="box" href={`/archive/${work.slug}`} data-archive-box style={`--tint:${tint}`}>
+  <span class="scene" aria-hidden="true">
+    <span class="cube">
+      <span class="face lid"></span>
+      <span class="face side"></span>
+      <span class="face front">
+        {
+          work.cover ? (
+            <img src={work.cover.src} width={work.cover.width} height={work.cover.height} alt="" loading="lazy" decoding="async" />
+          ) : (
+            <span class="mono face-title" data-box-face-title>
+              {work.titleEn}
+            </span>
+          )
+        }
+        <span class="tab mono">{String(index + 1).padStart(2, '0')}</span>
+      </span>
+    </span>
+  </span>
+  <span class="label mono">
+    <span class="num">{String(index + 1).padStart(2, '0')}</span>
+    <span data-box-name>{work.titleEn}</span>
+  </span>
+</a>
+
+<style>
+  /* An archive storage box in CSS 3D: chrome lid and side, the work's cover on the front. */
+  .box {
+    --w: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    text-decoration: none;
+    color: inherit;
+    outline-offset: 8px;
+  }
+  .scene {
+    display: block;
+    width: 100%;
+    aspect-ratio: 5 / 4;
+    perspective: 900px;
+    container-type: inline-size;
+  }
+  /* Every face starts at the cube centre and is pushed out by half the cube's size. */
+  .cube {
+    --W: 66cqw;
+    --H: 54cqw;
+    --D: 34cqw;
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(-16deg) rotateY(-30deg);
+    transition: transform 600ms var(--ease);
+  }
+  .face {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: block;
+    backface-visibility: hidden;
+  }
+  .front {
+    width: var(--W);
+    height: var(--H);
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--tint);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    transform: translate(-50%, -50%) translateZ(calc(var(--D) / 2));
+  }
+  .front img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .face-title {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: 12px;
+    text-align: center;
+  }
+  .tab {
+    position: absolute;
+    left: 50%;
+    bottom: 8%;
+    transform: translateX(-50%);
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink);
+  }
+  .side {
+    width: var(--D);
+    height: var(--H);
+    transform: translate(-50%, -50%) rotateY(90deg) translateZ(calc(var(--W) / 2));
+    background: linear-gradient(180deg, #fdfdfd 0%, #b6b9bf 30%, #eef0f2 50%, #8a8d93 78%, #cfd2d6 100%);
+  }
+  .lid {
+    width: var(--W);
+    height: var(--D);
+    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2));
+    background: linear-gradient(100deg, #ffffff 0%, #c9ccd1 30%, #f8f9fa 52%, #9ea1a7 80%, #e8eaed 100%);
+    transition: transform 600ms var(--ease);
+  }
+  .box:hover .cube,
+  .box:focus-visible .cube {
+    transform: rotateX(-12deg) rotateY(-18deg) translateY(-6px);
+  }
+  .box:hover .lid,
+  .box:focus-visible .lid {
+    transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--H) / 2 + 12px));
+  }
+  .label {
+    display: flex;
+    gap: 10px;
+    text-align: center;
+  }
+  .num {
+    color: var(--muted);
+  }
+</style>

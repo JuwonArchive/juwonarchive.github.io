@@ -1,19 +1,39 @@
 ---
-import { loadSite } from '../data/load';
-
+/** Inner-page top bar. Home has its own bottom-right nav (spec §11). */
 interface Props {
-  current?: 'works' | 'about';
+  current?: 'archive' | 'info' | 'item';
 }
 const { current } = Astro.props;
-const { contact } = loadSite();
 ---
 
 <header class="nav">
-  <a class="brand mono" href="/">JUWON</a>
+  {
+    current === 'item' ? (
+      <a class="pill" href="/archive">
+        ← ARCHIVE
+      </a>
+    ) : (
+      <a class="brand mono" href="/">
+        JUWON
+      </a>
+    )
+  }
+  {
+    current === 'item' && (
+      <a class="brand mono center" href="/">
+        JUWON
+      </a>
+    )
+  }
   <nav aria-label="Main">
-    <a class="pill" href="/works" aria-current={current === 'works' ? 'page' : undefined}>WORKS</a>
-    <a class="pill" href="/about" aria-current={current === 'about' ? 'page' : undefined}>ABOUT</a>
-    {contact.email && <a class="pill" href={`mailto:${contact.email}`}>CONTACT</a>}
+    {
+      current !== 'item' && (
+        <a class="pill" href="/archive" aria-current={current === 'archive' ? 'page' : undefined}>
+          ARCHIVE
+        </a>
+      )
+    }
+    <a class="pill" href="/info" aria-current={current === 'info' ? 'page' : undefined}>INFO</a>
   </nav>
 </header>
 
@@ -37,6 +57,11 @@ const { contact } = loadSite();
     font-weight: 600;
     text-decoration: none;
     letter-spacing: 0.08em;
+  }
+  .center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
   }
   nav {
     display: flex;

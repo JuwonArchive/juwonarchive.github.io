@@ -22,12 +22,6 @@
     } else {
       canvas.dataset.reflection = '';
       canvas.toggleAttribute('data-ready', true);
-      for (const item of document.querySelectorAll<HTMLElement>('[data-category-item]')) {
-        item.addEventListener('pointerenter', () => hero.setReflection(item.dataset.cover || null));
-        item.addEventListener('focus', () => hero.setReflection(item.dataset.cover || null));
-        item.addEventListener('pointerleave', () => hero.setReflection(null));
-        item.addEventListener('blur', () => hero.setReflection(null));
-      }
     }
   }
 </script>

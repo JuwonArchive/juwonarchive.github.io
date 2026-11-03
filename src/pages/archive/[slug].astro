@@ -1,0 +1,181 @@
+---
+import Base from '../../layouts/Base.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import BlockRenderer from '../../components/BlockRenderer.astro';
+import { loadSite } from '../../data/load';
+import { config } from '../../config';
+import { longestWord } from '../../lib/fit';
+import { splitSections } from '../../lib/sections';
+import type { Work } from '../../lib/site-schema';
+
+export function getStaticPaths() {
+  const { works } = loadSite();
+  return works.map((work, i) => ({
+    params: { slug: work.slug },
+    props: {
+      work,
+      index: i,
+      total: works.length,
+      prev: works[(i - 1 + works.length) % works.length],
+      next: works[(i + 1) % works.length],
+    },
+  }));
+}
+
+interface Props {
+  work: Work;
+  index: number;
+  total: number;
+  prev: Work;
+  next: Work;
+}
+const { work, index, total, prev, next } = Astro.props;
+const { contact } = loadSite();
+const tint = config.pastels[index % config.pastels.length];
+const { intro, sections } = splitSections(work.blocks);
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<Base title={`${work.titleEn} — JUWON`} description={`${work.titleEn} — ${work.tags.join(', ')}. Work by JUWON.`}>
+  <Nav slot="header" current="item" />
+  <main class="item">
+    <header class="summary">
+      <p class="mono num">ARCHIVE {pad(index + 1)} / {pad(total)}</p>
+      <h1 class="display fit title" style={`--chars:${longestWord(work.titleEn)}`}>{work.titleEn}</h1>
+      <div class="meta">
+        {work.tags.length > 0 && <span class="mono key">TOOLS</span>}
+        {work.tags.map((t) => <span class="pill tag">{t}</span>)}
+        {
+          work.link && (
+            <a class="pill" href={work.link} target="_blank" rel="noopener">
+              ↗ LINK
+            </a>
+          )
+        }
+      </div>
+      {
+        intro.length > 0 && (
+          <details class="more" data-more-info>
+            <summary class="mono">+ MORE INFO</summary>
+            <BlockRenderer blocks={intro} title={work.titleEn} />
+          </details>
+        )
+      }
+    </header>
+
+    {
+      sections.map((section, i) => (
+        <section class="section" aria-labelledby={`section-${i + 1}`}>
+          <div class="section-head">
+            <h2 id={`section-${i + 1}`} class="mono" data-section-label>
+              SECTION {pad(i + 1)}
+            </h2>
+            {section.title && <p class="section-title">{section.title}</p>}
+          </div>
+          <BlockRenderer blocks={section.blocks} title={work.titleEn} />
+        </section>
+      ))
+    }
+
+    <nav class="pager" aria-label="Archive">
+      <a class="pill" href={`/archive/${prev.slug}`}>← PREV</a>
+      {contact.email && <a class="pill" href={`mailto:${contact.email}`}>CONTACT</a>}
+      <a class="pill" href={`/archive/${next.slug}`}>NEXT →</a>
+    </nav>
+  </main>
+  <Footer slot="footer" />
+</Base>
+
+<style define:vars={{ tint }}>
+  .item {
+    padding: 120px var(--gutter) 64px;
+  }
+  .summary {
+    max-width: 1280px;
+    margin: 0 auto clamp(56px, 8vw, 112px);
+    text-align: center;
+  }
+  .summary::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 70svh;
+    background: linear-gradient(var(--tint), transparent);
+    z-index: -1;
+  }
+  .num {
+    margin: 0 0 16px;
+    color: var(--muted);
+  }
+  .title {
+    --fit-max: 200px;
+    --fit-width: (min(100vw, 1280px + 2 * var(--gutter)) - 2 * var(--gutter));
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-top: 24px;
+  }
+  .key {
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  .tag {
+    cursor: default;
+    text-transform: none;
+  }
+  .tag:hover {
+    background: var(--white);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .more {
+    max-width: 680px;
+    margin: 32px auto 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    text-align: left;
+  }
+  .more summary {
+    cursor: pointer;
+    list-style: none;
+    text-align: center;
+  }
+  .more summary::-webkit-details-marker {
+    display: none;
+  }
+  .more[open] summary {
+    margin-bottom: 20px;
+  }
+  .section {
+    max-width: 1280px;
+    margin: 0 auto clamp(72px, 10vw, 140px);
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .section-head h2 {
+    margin: 0;
+    font-weight: 400;
+  }
+  .section-title {
+    margin: 0;
+    color: var(--muted);
+  }
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    max-width: 1280px;
+    margin: 96px auto 0;
+  }
+</style>
