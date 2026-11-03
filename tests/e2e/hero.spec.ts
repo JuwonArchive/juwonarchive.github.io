@@ -154,3 +154,19 @@ test.describe('god rays', () => {
     expect(await page.locator('[data-godrays]').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
   });
 });
+
+test('god rays stay short and faint (user: natural, not overdone)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const r = await page.locator('[data-orbit]').evaluate((svg) => {
+    const rays = svg.querySelector<SVGGElement>('[data-godrays]')!;
+    const box = rays.getBBox();
+    const reach = Math.max(-box.x, -box.y, box.x + box.width, box.y + box.height);
+    const opacities = [...rays.querySelectorAll('path')].map((p) => Number(p.getAttribute('opacity')));
+    return { reach, maxOpacity: Math.max(...opacities), count: opacities.length };
+  });
+  const SPHERE_R = 72;
+  expect(r.reach).toBeLessThanOrEqual(SPHERE_R * 2.5);
+  expect(r.maxOpacity).toBeLessThanOrEqual(0.45);
+  expect(r.count).toBeGreaterThanOrEqual(24);
+});

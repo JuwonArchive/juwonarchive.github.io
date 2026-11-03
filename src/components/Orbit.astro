@@ -30,19 +30,25 @@ const shells = works.map((w, i) => {
 });
 const outer = R0 + (works.length - 1) * STEP + 70;
 
-// God rays: wedges from the sphere, gathered toward the upper-right highlight (deterministic "random").
+// God rays: many thin, faint shafts starting at the sphere's edge. Brightest toward the
+// upper-right highlight, fading smoothly around the rest; lengths and widths vary like real light.
 const rand = (i: number) => {
   const x = Math.sin(i * 12.9898) * 43758.5453;
   return x - Math.floor(x);
 };
-const rays = Array.from({ length: 16 }, (_, i) => {
-  const main = i < 11;
-  const angle = main ? -45 + (rand(i) - 0.5) * 150 : rand(i + 50) * 360;
-  const half = (main ? 1.5 + rand(i + 9) * 4 : 1 + rand(i + 9) * 2) * (Math.PI / 180);
-  const len = main ? 260 + rand(i + 3) * 200 : 180 + rand(i + 3) * 120;
+const SPHERE_R = 72;
+const rays = Array.from({ length: 36 }, (_, i) => {
+  const angle = (i / 36) * 360 + (rand(i) - 0.5) * 8;
+  const fromHighlight = Math.abs(((angle + 45 + 540) % 360) - 180); // 0 = pointing at the highlight
+  const weight = Math.pow(Math.cos((fromHighlight * Math.PI) / 360), 3); // 1 at highlight → 0 opposite
+  const len = SPHERE_R * (1.45 + weight * 0.75 + rand(i + 3) * 0.25);
+  const half = (0.6 + rand(i + 9) * 1.6) * (Math.PI / 180);
   const a = (angle * Math.PI) / 180;
-  const p = (t: number) => `${(Math.cos(t) * len).toFixed(1)} ${(Math.sin(t) * len).toFixed(1)}`;
-  return { d: `M0 0 L${p(a - half)} L${p(a + half)} Z`, opacity: main ? 0.55 + rand(i + 21) * 0.45 : 0.3 };
+  const at = (t: number, r: number) => `${(Math.cos(t) * r).toFixed(1)} ${(Math.sin(t) * r).toFixed(1)}`;
+  return {
+    d: `M${at(a - half * 0.4, SPHERE_R * 0.92)} L${at(a - half, len)} L${at(a + half, len)} L${at(a + half * 0.4, SPHERE_R * 0.92)} Z`,
+    opacity: Number((0.08 + weight * 0.32 * (0.7 + rand(i + 21) * 0.3)).toFixed(2)),
+  };
 });
 ---
 
@@ -103,12 +109,12 @@ const rays = Array.from({ length: 16 }, (_, i) => {
       <stop offset="45%" stop-color="#1e7bff" stop-opacity=".45"></stop>
       <stop offset="100%" stop-color="#1e7bff" stop-opacity="0"></stop>
     </radialGradient>
-    <radialGradient id="ray-fade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="300">
-      <stop offset="10%" stop-color="#a9dcff" stop-opacity=".95"></stop>
-      <stop offset="45%" stop-color="#6fb6ff" stop-opacity=".4"></stop>
-      <stop offset="85%" stop-color="#6fb6ff" stop-opacity="0"></stop>
+    <radialGradient id="ray-fade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="180">
+      <stop offset="38%" stop-color="#9fd6ff" stop-opacity="1"></stop>
+      <stop offset="62%" stop-color="#78bcff" stop-opacity=".5"></stop>
+      <stop offset="100%" stop-color="#78bcff" stop-opacity="0"></stop>
     </radialGradient>
-    <filter id="ray-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+    <filter id="ray-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5"></feGaussianBlur></filter>
     <filter id="soft-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="20"></feGaussianBlur></filter>
   </defs>
 
@@ -207,29 +213,26 @@ const rays = Array.from({ length: 16 }, (_, i) => {
   .godrays {
     transform-origin: 0 0;
     animation:
-      sway 16s ease-in-out infinite alternate,
-      flicker 5s ease-in-out infinite alternate;
+      sway 22s ease-in-out infinite alternate,
+      flicker 7s ease-in-out infinite alternate;
   }
   @keyframes sway {
     from {
-      transform: rotate(-7deg);
+      transform: rotate(-3deg);
     }
     to {
-      transform: rotate(7deg);
+      transform: rotate(3deg);
     }
   }
   @keyframes flicker {
     0% {
-      opacity: 0.7;
+      opacity: 0.85;
     }
-    40% {
+    50% {
       opacity: 1;
-    }
-    70% {
-      opacity: 0.8;
     }
     100% {
-      opacity: 1;
+      opacity: 0.9;
     }
   }
   .glow {
