@@ -151,3 +151,11 @@ test.describe('opening animation', () => {
     await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 300 });
   });
 });
+
+test('halftone has a slight dreamy blur (user)', async ({ page }) => {
+  await page.goto('/');
+  const f = await page.locator('canvas[data-halftone]').evaluate((c) => getComputedStyle(c).filter);
+  const px = Number(f.match(/blur\(([\d.]+)px\)/)?.[1] ?? 0);
+  expect(px).toBeGreaterThan(0.5);
+  expect(px).toBeLessThanOrEqual(2.5);
+});
