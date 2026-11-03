@@ -174,4 +174,4 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 
 - Display words and small text are **Ink `#111111`** (black, user decision); Muted `#7B8794` for secondary labels.
 - Tints are icy (ice, frost, mist, steel). No warm tones anywhere.
-- Home: JUWON at the bottom; a small mono top bar (label left, visitor's local time right). Behind, a halftone artwork in `#DAE0E5` morphs through four original forms (fold, vortex, torus, bloom) and turns toward the pointer. Plain white, no fog.
+- Home: JUWON at the bottom; a small mono top bar (label left, visitor's local time right). Behind, a halftone artwork in `#DAE0E5` morphs through four original forms (orb, vortex, torus, bloom) and may run behind the name and turns toward the pointer. Plain white, no fog.

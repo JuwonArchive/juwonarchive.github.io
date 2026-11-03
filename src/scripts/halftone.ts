@@ -1,6 +1,6 @@
 /**
  * Halftone artwork. A fixed set of dots morphs between forms:
- *   fold — a sheet folded by crossing waves
+ *   orb — a sphere whose surface swells like liquid
  *   vortex — a spiral funnel
  *   torus — a breathing, twisting torus
  *   bloom — radial petals rising and falling
@@ -12,7 +12,7 @@ type Opts = { color: string; pitch: number; reducedMotion: boolean; avoid?: () =
 type P = { x: number; y: number; z: number; nx: number; ny: number; nz: number; w: number };
 
 const N = 1600;
-const FORMS = ['fold', 'vortex', 'torus', 'bloom'] as const;
+const FORMS = ['orb', 'vortex', 'torus', 'bloom'] as const;
 type Form = (typeof FORMS)[number];
 const HOLD = 6; // seconds a form stays
 const MORPH = 2.5; // seconds to flow into the next
@@ -49,17 +49,24 @@ function surface(NU: number, NV: number, f: (u: number, v: number) => [number, n
 
 const soft = (x: number) => Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, x))), 0.6);
 
-/** A sheet folded by crossing waves, drifting like cloth. */
-const fold = (t: number) =>
+/** An organic orb: a sphere whose surface swells and sinks like liquid. */
+const orb = (t: number) =>
   surface(
-    50,
-    32,
+    64,
+    25,
     (u, v) => {
-      const x = (u - 0.5) * 2.2;
-      const y = (v - 0.5) * 1.25;
-      return [x, y, 0.32 * Math.sin(x * 2.1 + t * 0.6) + 0.22 * Math.cos(y * 3.2 - x * 1.1 + t * 0.45)];
+      const a = u * Math.PI * 2;
+      const b = (v - 0.5) * Math.PI;
+      const nx = Math.cos(b) * Math.cos(a);
+      const ny = Math.sin(b);
+      const nz = Math.cos(b) * Math.sin(a);
+      const r =
+        0.78 +
+        0.13 * Math.sin(nx * 3.1 + t * 0.7) * Math.cos(ny * 2.7 - t * 0.5) +
+        0.08 * Math.sin(nz * 4.3 + nx * 1.7 + t * 0.9);
+      return [nx * r, ny * r, nz * r];
     },
-    (u, v) => soft(u) * soft(v),
+    (_, v) => 0.6 + 0.4 * Math.pow(Math.cos((v - 0.5) * Math.PI), 0.5),
   );
 
 /** A spiral funnel turning slowly. */
@@ -104,7 +111,7 @@ const bloom = (t: number) =>
     (_, v) => soft(v * 0.95 + 0.05) * (0.6 + 0.4 * v),
   );
 
-const BUILD: Record<Form, (t: number) => P[]> = { fold, vortex, torus, bloom };
+const BUILD: Record<Form, (t: number) => P[]> = { orb, vortex, torus, bloom };
 const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
@@ -241,7 +248,7 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
     let overlaps = 0;
     for (let i = 0; i < N; i++) {
       if (sr[i] <= 0 || nearest[i] === Infinity) continue;
-      sr[i] = Math.min(sr[i], nearest[i] * 0.42);
+      sr[i] = Math.min(sr[i], nearest[i] * 0.47);
       if (sr[i] * 2 > nearest[i] + 0.01) overlaps++;
     }
     canvas.dataset.overlaps = String(overlaps);
@@ -260,9 +267,9 @@ export function mountHalftone(canvas: HTMLCanvasElement, opts: Opts) {
 
     const mobile = w < 768;
     const cx = mobile ? w * 0.5 : w * 0.55;
-    const cy = mobile ? h * 0.4 : h * 0.42;
-    const size = mobile ? w * 0.44 : Math.min(w * 0.36, h * 0.5);
-    const maxR = Math.min(opts.pitch * 0.66, size * 0.028);
+    const cy = mobile ? h * 0.6 : h * 0.46;
+    const size = mobile ? w * 0.56 : Math.min(w * 0.38, h * 0.52);
+    const maxR = Math.min(opts.pitch * 0.8, size * 0.034);
     const yaw = pose.yaw + Math.sin(t * 0.15) * 0.25;
     const pitch = pose.pitch + 0.3;
     const roll = 0.2;

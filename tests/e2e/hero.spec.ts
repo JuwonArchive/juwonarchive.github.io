@@ -39,7 +39,7 @@ test.describe('home graphics', () => {
     const canvas = page.locator('canvas[data-halftone]');
     await expect(canvas).toBeVisible();
     await expect(canvas).toHaveAttribute('data-color', '#dae0e5');
-    await expect(canvas).toHaveAttribute('data-form', 'fold');
+    await expect(canvas).toHaveAttribute('data-form', 'orb');
     // Coverage: some cells are dense, most of the page stays open.
     const share = await canvas.evaluate((c: HTMLCanvasElement) => {
       const ctx = c.getContext('2d')!;
@@ -65,13 +65,13 @@ test.describe('home graphics', () => {
     expect(share.dense).toBeGreaterThan(0.02);
   });
 
-  test('the field clears behind JUWON so the name reads', async ({ page }) => {
+  test('the artwork may run behind JUWON (no cut-off zone)', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const h1 = (await page.locator('h1').boundingBox())!;
-    for (const fx of [0.2, 0.5, 0.8]) {
-      expect(await inkAround(page, h1.x + h1.width * fx, h1.y + h1.height / 2, 30)).toBeLessThan(3);
-    }
+    let ink = 0;
+    for (const fx of [0.3, 0.5, 0.7]) ink += await inkAround(page, h1.x + h1.width * fx, h1.y + h1.height * 0.2, 40);
+    expect(ink).toBeGreaterThan(3);
   });
 
   test('ribbon dots never merge into each other (user)', async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe('home graphics', () => {
     const canvas = page.locator('canvas[data-halftone]');
     const forms = (await canvas.getAttribute('data-forms'))!.split(',');
     expect(forms.length).toBeGreaterThanOrEqual(4);
-    expect(forms).toEqual(expect.arrayContaining(['fold', 'vortex', 'torus', 'bloom'])); // original forms
+    expect(forms).toEqual(expect.arrayContaining(['orb', 'vortex', 'torus', 'bloom'])); // original forms
     const seen = new Set<string>();
     for (let i = 0; i < 22 && seen.size < 2; i++) {
       seen.add((await canvas.getAttribute('data-form'))!);

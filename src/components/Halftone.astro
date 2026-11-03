@@ -15,7 +15,6 @@
       color: canvas.dataset.color ?? '#dae0e5',
       pitch,
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      avoid: () => document.querySelector('.home h1'),
       trace: document.querySelector<HTMLCanvasElement>('canvas[data-trace]'),
       traceColor: '#111111',
     });
