@@ -3,6 +3,7 @@ import type { Block } from '../lib/site-schema';
 import RichText from './RichText.astro';
 import { igCrop } from '../lib/ig-crop';
 import CropMarks from './CropMarks.astro';
+import IgLink from './IgLink.astro';
 
 interface Props {
   blocks: Block[];
@@ -57,41 +58,27 @@ const isFirstImage = () => {
           return <hr class="b-divider" />;
         case 'image': {
           const first = isFirstImage();
-          // Detail-page style images (more than 2× taller than wide) show their top at full width.
-          const tall = !!(b.media.width && b.media.height && b.media.height > b.media.width * 2);
           return (
             <figure class="b-media">
               <CropMarks>
-              <a
-                class="frame"
-                data-frame
-                data-tall={tall ? '' : undefined}
-                href={b.media.src}
-                target="_blank"
-                rel="noopener"
-                aria-label="Open full-size image"
-                style={tall ? `--natural-w:${b.media.width}px` : undefined}
-              >
-                <img
-                  src={b.media.src}
-                  width={b.media.width}
-                  height={b.media.height}
-                  alt={b.caption ? b.caption.map((s) => s.text).join('') : ''}
-                  loading={first ? 'eager' : 'lazy'}
-                  fetchpriority={first ? 'high' : undefined}
-                  decoding="async"
-                />
-                {tall && <span class="mono view-full">VIEW FULL ↗</span>}
-              </a>
+                <div class="frame" data-frame>
+                  <a class="zoom" href={b.media.src} target="_blank" rel="noopener" aria-label="Open full-size image">
+                    <img
+                      src={b.media.src}
+                      width={b.media.width}
+                      height={b.media.height}
+                      alt={b.caption ? b.caption.map((s) => s.text).join('') : ''}
+                      loading={first ? 'eager' : 'lazy'}
+                      fetchpriority={first ? 'high' : undefined}
+                      decoding="async"
+                    />
+                  </a>
+                  {b.source && <IgLink href={b.source} />}
+                </div>
               </CropMarks>
-              {(b.caption || b.source) && (
+              {b.caption && (
                 <figcaption class="mono">
-                  {b.caption && <RichText text={b.caption} />}
-                  {b.source && (
-                    <a class="source" href={b.source} target="_blank" rel="noopener">
-                      OPEN ON INSTAGRAM ↗
-                    </a>
-                  )}
+                  <RichText text={b.caption} />
                 </figcaption>
               )}
             </figure>
@@ -102,17 +89,23 @@ const isFirstImage = () => {
             <figure class="b-media">
               <CropMarks>
                 <div class="frame" data-frame>
-                  <video src={b.media.src} muted playsinline loop controls preload="metadata" data-inview-play />
+                  <video
+                    src={b.media.src}
+                    width={b.media.width}
+                    height={b.media.height}
+                    muted
+                    playsinline
+                    loop
+                    controls
+                    preload="metadata"
+                    data-inview-play
+                  />
+                  {b.source && <IgLink href={b.source} />}
                 </div>
               </CropMarks>
-              {(b.caption || b.source) && (
+              {b.caption && (
                 <figcaption class="mono">
-                  {b.caption && <RichText text={b.caption} />}
-                  {b.source && (
-                    <a class="source" href={b.source} target="_blank" rel="noopener">
-                      OPEN ON INSTAGRAM ↗
-                    </a>
-                  )}
+                  <RichText text={b.caption} />
                 </figcaption>
               )}
             </figure>
@@ -129,33 +122,37 @@ const isFirstImage = () => {
               scrolling="no"
             />
           );
-          const sizedInstagram = b.provider === 'instagram' && b.aspect;
+          const ig = b.provider === 'instagram';
+          const crop = ig && b.aspect ? igCrop(b.aspect) : null;
+          // Frame takes the post's own shape: cropped Instagram post, full Instagram embed, or 16:9 player.
+          const aspect = crop ? `${crop.width} / ${crop.height}` : ig ? '400 / 720' : '16 / 9';
           return (
             <figure class={`b-embed b-embed--${b.provider}`}>
               <CropMarks>
-              {sizedInstagram ? (
-                <div class="frame" data-frame>
-                  <div
-                    class="ig-crop"
-                    data-ig-crop
-                    data-w={igCrop(b.aspect!).width}
-                    data-h={igCrop(b.aspect!).height}
-                    style={`--crop-w:${igCrop(b.aspect!).width}px;--crop-h:${igCrop(b.aspect!).height}px;--off-x:${igCrop(b.aspect!).offsetX}px`}
-                  >
-                    {iframe}
-                  </div>
+                <div class={`frame frame--embed${ig && !crop ? ' frame--portrait' : ''}`} data-frame style={`aspect-ratio:${aspect}`}>
+                  {crop ? (
+                    <div
+                      class="ig-crop"
+                      data-ig-crop
+                      data-w={crop.width}
+                      data-h={crop.height}
+                      style={`--crop-w:${crop.width}px;--crop-h:${crop.height}px;--off-x:${crop.offsetX}px`}
+                    >
+                      {iframe}
+                    </div>
+                  ) : (
+                    iframe
+                  )}
+                  {ig && <IgLink href={b.url} />}
                 </div>
-              ) : (
-                <div class={`frame${b.provider === 'instagram' ? ' frame--portrait' : ''}`} data-frame>
-                  {iframe}
-                </div>
-              )}
               </CropMarks>
-              <figcaption class="mono">
-                <a href={b.url} target="_blank" rel="noopener">
-                  OPEN ON {b.provider.toUpperCase()} ↗
-                </a>
-              </figcaption>
+              {!ig && (
+                <figcaption class="mono">
+                  <a href={b.url} target="_blank" rel="noopener">
+                    OPEN ON {b.provider.toUpperCase()} ↗
+                  </a>
+                </figcaption>
+              )}
             </figure>
           );
         }
@@ -173,9 +170,8 @@ const isFirstImage = () => {
 </div>
 
 <script>
-  // Instagram embeds render at a natural 400px width and are scaled into the 16:9 frame.
-  // Sized posts are cropped to the post itself (Instagram's header and footer stay hidden);
-  // unsized ones fall back to the whole embed scaled to the frame height.
+  // Instagram embeds render at a natural 400px width and are scaled to fill their frame,
+  // which already has the post's own shape. Sized posts are cropped to the post itself.
   const NATURAL_H = 720;
   const fit = (frame: HTMLElement) => {
     const crop = frame.querySelector<HTMLElement>('[data-ig-crop]');
@@ -255,54 +251,29 @@ const isFirstImage = () => {
     max-width: 1280px;
     margin: 0;
   }
-  /* One frame for every post: 16:9, at most 1280×720. The work is shown whole, never cropped. */
+  /* Every post is the same width (up to 1280px); height follows the work itself, never cropped. */
   .frame {
     position: relative;
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 9;
     overflow: hidden;
     border-radius: var(--radius-card);
     background: rgba(0, 0, 0, 0.04);
   }
-  .frame {
-    display: grid;
-    place-items: center;
-  }
-  /* Images keep their own pixel size as the upper bound so small files are never stretched (blurred). */
-  .frame img {
-    width: auto;
+  .frame img,
+  .frame video {
+    display: block;
+    width: 100%;
     height: auto;
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
   }
-  .frame[data-tall] img {
-    width: min(100%, var(--natural-w));
-    height: 100%;
-    max-height: none;
-    object-fit: cover;
-    object-position: 50% 0%;
-    align-self: start;
+  .zoom {
+    display: block;
+    cursor: zoom-in;
   }
-  .view-full {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    padding: 6px 10px;
-    border-radius: var(--radius-pill);
-    background: var(--ink);
-    color: var(--white);
-  }
-  .frame video,
-  .frame iframe {
+  .frame--embed iframe {
     width: 100%;
     height: 100%;
-    object-fit: contain;
     border: 0;
-  }
-  a.frame {
-    cursor: zoom-in;
   }
   .frame--portrait iframe {
     position: absolute;

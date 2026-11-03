@@ -182,7 +182,7 @@ export function mountOrbitHalftone(opts: Opts) {
     dctx.fillStyle = opts.dotColor;
     // Smallest dot 1px (no micro-dots), largest 3.4px.
     const MIN_R = 1;
-    const max = 3.4;
+    const max = w < 768 ? 2.4 : 3.4; // smaller dots on phones
     const buckets = new Map<number, number[]>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {

@@ -33,7 +33,7 @@ test.describe('home graphics', () => {
     expect(errors).toEqual([]);
   });
 
-  test('orbit line art rendered through a halftone screen', async ({ page }) => {
+  test('orbit line art rendered through a halftone screen', async ({ page, isMobile }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const canvas = page.locator('canvas[data-halftone]');
@@ -53,6 +53,7 @@ test.describe('home graphics', () => {
           total++;
           if (mean > 8) inked++;
           if (mean > 40) dense++;
+          else if (mean > 22 && c.clientWidth < 768) dense++; // phones use smaller dots (user)
         }
       return { inked: inked / total, dense: dense / total };
     });
@@ -85,7 +86,8 @@ test.describe('home graphics', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const sizes = Number(await page.locator('canvas[data-halftone]').getAttribute('data-size-steps'));
-    expect(sizes).toBeGreaterThanOrEqual(8);
+    // Phones span 1–2.4px (user asked for smaller dots), so fewer quarter-pixel steps exist.
+    expect(sizes).toBeGreaterThanOrEqual(page.viewportSize()!.width < 768 ? 6 : 8);
   });
 
   test('dots swell around the pointer', async ({ page, isMobile }) => {
@@ -238,4 +240,24 @@ test('graphic is centred on both axes, desktop and phone (user)', async ({ page 
   });
   expect(Math.abs(r.x - r.w / 2)).toBeLessThanOrEqual(1);
   expect(Math.abs(r.y - r.h / 2)).toBeLessThanOrEqual(1);
+});
+
+test('JUWON is centred (user)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
+  const r = await page.evaluate(() => {
+    const h1 = document.querySelector('.home h1')!;
+    const range = document.createRange();
+    range.selectNodeContents(h1);
+    const b = range.getBoundingClientRect();
+    return { mid: b.left + b.width / 2, vw: document.documentElement.clientWidth };
+  });
+  expect(Math.abs(r.mid - r.vw / 2)).toBeLessThan(6);
+});
+
+test('phones use smaller halftone dots (user)', async ({ page, isMobile }) => {
+  test.skip(!isMobile);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  expect(Number(await page.locator('canvas[data-halftone]').getAttribute('data-max-r'))).toBeLessThanOrEqual(2.5);
 });

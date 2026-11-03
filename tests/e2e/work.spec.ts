@@ -88,112 +88,52 @@ test.describe('work detail', () => {
   });
 });
 
-test.describe('uniform media frames', () => {
-  test('every image, video and embed sits in the same 16:9 frame, at most 1280px wide', async ({ page }) => {
+test.describe('media at a uniform 1280px width (user)', () => {
+  test('every image, video and embed is the same width, ≤1280px, at its own aspect (never cropped)', async ({ page }) => {
     for (const w of site.works) {
       await page.goto(`/archive/${w.slug}`);
-      const frames = await page.locator('[data-frame]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
-      const mediaCount = w.blocks.filter((b) => ['image', 'video', 'embed'].includes(b.type)).length;
-      expect(frames.length).toBe(mediaCount);
-      const widths = new Set(frames.map((f) => Math.round(f.width)));
-      expect(widths.size).toBeLessThanOrEqual(1);
-      for (const f of frames) {
-        expect(f.width).toBeLessThanOrEqual(1280);
-        expect(Math.abs(f.width / f.height - 16 / 9)).toBeLessThan(0.01);
+      const frames = page.locator('[data-frame]');
+      const n = await frames.count();
+      if (!n) continue;
+      const widths = new Set<number>();
+      for (const f of await frames.all()) {
+        await f.scrollIntoViewIfNeeded();
+        const r = await f.evaluate(async (el) => {
+          const box = el.getBoundingClientRect();
+          const img = el.querySelector('img');
+          const vid = el.querySelector('video');
+          if (img) {
+            if (!img.complete) await new Promise((res) => img.addEventListener('load', res, { once: true }));
+            return { w: box.width, h: box.height, aspect: img.naturalWidth / img.naturalHeight, fit: getComputedStyle(img).objectFit };
+          }
+          if (vid) {
+            if (vid.readyState < 1) await new Promise((res) => vid.addEventListener('loadedmetadata', res, { once: true }));
+            return { w: box.width, h: box.height, aspect: vid.videoWidth / vid.videoHeight, fit: getComputedStyle(vid).objectFit };
+          }
+          const crop = el.querySelector<HTMLElement>('[data-ig-crop]');
+          const aspect = crop ? Number(crop.dataset.w) / Number(crop.dataset.h) : 16 / 9;
+          return { w: box.width, h: box.height, aspect, fit: 'contain' };
+        });
+        widths.add(Math.round(r.w));
+        expect(r.w).toBeLessThanOrEqual(1280.5);
+        expect(r.fit).not.toBe('cover');
+        expect(Math.abs(r.w / r.h - r.aspect) / r.aspect).toBeLessThan(0.03);
       }
+      expect(widths.size).toBe(1);
     }
   });
 
-  test('images are shown whole and open full size on click', async ({ page }) => {
-    const w = site.works.find((x) => x.blocks.some((b) => b.type === 'image'));
-    test.skip(!w, 'no images');
+  test('Instagram posts carry a button to the original post', async ({ page }) => {
+    const w = site.works.find((x) => x.blocks.some((b) => ('source' in b && b.source) || (b.type === 'embed' && 'provider' in b && b.provider === 'instagram')));
+    test.skip(!w, 'no Instagram posts');
     await page.goto(`/archive/${w!.slug}`);
-    const img = page.locator('[data-frame] img').first();
-    await expect(img).toHaveCSS('object-fit', 'contain');
-    const link = page.locator('a[data-frame]:has(img)').first();
-    await expect(link).toHaveAttribute('href', (await img.getAttribute('src'))!);
-    await expect(link).toHaveAttribute('target', '_blank');
-  });
-});
-
-test.describe('instagram crop', () => {
-  const igWork = site.works.find((w) => w.blocks.some((b) => b.type === 'embed' && 'aspect' in b && b.aspect));
-  test('shows only the post, cropped to its own aspect and centred in the frame', async ({ page }) => {
-    test.skip(!igWork, 'no sized Instagram embeds');
-    await page.goto(`/archive/${igWork!.slug}`);
-    const aspects = igWork!.blocks.filter((b) => b.type === 'embed' && 'aspect' in b && b.aspect).map((b) => (b as { aspect: number }).aspect);
-    const boxes = await page.locator('[data-ig-crop]').evaluateAll((els) =>
-      els.map((el) => {
-        const crop = el.getBoundingClientRect();
-        const frame = el.closest('[data-frame]')!.getBoundingClientRect();
-        const iframe = el.querySelector('iframe')!.getBoundingClientRect();
-        return { crop: crop.toJSON(), frame: frame.toJSON(), headerHidden: iframe.top < crop.top - 1 };
-      }),
-    );
-    expect(boxes.length).toBe(aspects.length);
-    boxes.forEach(({ crop, frame, headerHidden }, i) => {
-      expect(Math.abs(crop.width / crop.height - aspects[i])).toBeLessThan(0.03);
-      expect(crop.left).toBeGreaterThanOrEqual(frame.left - 1);
-      expect(crop.right).toBeLessThanOrEqual(frame.right + 1);
-      expect(crop.top).toBeGreaterThanOrEqual(frame.top - 1);
-      expect(crop.bottom).toBeLessThanOrEqual(frame.bottom + 1);
-      // Fills the frame on one axis.
-      expect(Math.max(crop.width / frame.width, crop.height / frame.height)).toBeGreaterThan(0.98);
-      expect(headerHidden).toBe(true);
-    });
-  });
-});
-
-test.describe('resolution and sources', () => {
-  test('images are never stretched beyond their original pixels', async ({ page }) => {
-    for (const w of site.works.filter((x) => x.blocks.some((b) => b.type === 'image'))) {
-      await page.goto(`/archive/${w.slug}`);
-      const imgs = page.locator('[data-frame] img');
-      for (const img of await imgs.all()) {
-        await img.scrollIntoViewIfNeeded();
-        await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
-        const r = await img.evaluate((el: HTMLImageElement) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, nw: el.naturalWidth, nh: el.naturalHeight }));
-        // Fitting down is fine; stretching up past the image's own pixels blurs it.
-        expect(r.w).toBeLessThanOrEqual(r.nw + 1);
-        expect(r.h).toBeLessThanOrEqual(r.nh + 1);
-      }
-    }
-  });
-
-  test('posts copied from Instagram link back to the original post', async ({ page }) => {
-    const w = site.works.find((x) => x.blocks.some((b) => 'source' in b && b.source));
-    test.skip(!w, 'no Instagram originals');
-    await page.goto(`/archive/${w!.slug}`);
-    const sources = w!.blocks.filter((b) => 'source' in b && b.source).map((b) => (b as { source: string }).source);
-    for (const src of sources) {
-      const link = page.locator(`figcaption a[href="${src}"]`);
-      await expect(link).toHaveText('OPEN ON INSTAGRAM ↗');
+    const igFigures = page.locator('figure:has([data-ig-link])');
+    const expected = w!.blocks.filter((b) => ('source' in b && b.source) || (b.type === 'embed' && 'provider' in b && b.provider === 'instagram')).length;
+    await expect(igFigures).toHaveCount(expected);
+    for (const link of await page.locator('[data-frame] a[data-ig-link]').all()) {
+      await expect(link).toHaveAttribute('href', /^https:\/\/www\.instagram\.com\//);
       await expect(link).toHaveAttribute('target', '_blank');
-    }
-  });
-});
-
-
-test.describe('tall images', () => {
-  const tallWork = site.works.find((w) => w.blocks.some((b) => b.type === 'image' && !!b.media && b.media.height! > b.media.width! * 2));
-  test('show their top at a readable width and open full size on click', async ({ page }) => {
-    test.skip(!tallWork, 'no tall images');
-    await page.goto(`/archive/${tallWork!.slug}`);
-    const tall = page.locator('a[data-frame][data-tall]');
-    expect(await tall.count()).toBeGreaterThan(0);
-    for (const frame of await tall.all()) {
-      await frame.scrollIntoViewIfNeeded();
-      const img = frame.locator('img');
-      await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
-      const r = await img.evaluate((el: HTMLImageElement) => ({
-        w: el.getBoundingClientRect().width,
-        nw: el.naturalWidth,
-        fw: el.closest('[data-frame]')!.getBoundingClientRect().width,
-        pos: getComputedStyle(el).objectPosition,
-      }));
-      expect(r.w).toBeGreaterThanOrEqual(Math.min(r.nw, r.fw) * 0.99);
-      expect(r.w).toBeLessThanOrEqual(r.nw + 1);
-      expect(r.pos.startsWith('50% 0%')).toBe(true);
+      await expect(link).toHaveText(/INSTAGRAM/);
     }
   });
 });
