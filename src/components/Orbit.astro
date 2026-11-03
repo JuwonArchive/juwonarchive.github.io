@@ -1,7 +1,7 @@
 ---
 /**
  * Home 2D animation: an electron-shell diagram. One shell per archive (numbered like K, L, M, N),
- * its electrons labelled with that work's tools; a soft pastel core sits in the nucleus.
+ * its electrons labelled with that work's tools; a shimmering 2D sphere sits in the nucleus.
  */
 import type { Work } from '../lib/site-schema';
 
@@ -33,17 +33,55 @@ const outer = R0 + (works.length - 1) * STEP + 70;
 
 <svg class="orbit" data-orbit viewBox={`${-outer} ${-outer} ${outer * 2} ${outer * 2}`} aria-hidden="true">
   <defs>
-    <radialGradient id="core">
-      <stop offset="0%" stop-color="#bff6ec" stop-opacity="0.95"></stop>
-      <stop offset="45%" stop-color="#d8cdff" stop-opacity="0.7"></stop>
-      <stop offset="75%" stop-color="#ffc9e8" stop-opacity="0.35"></stop>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+    <!-- Sphere body: off-centre highlight, colour drifting lavender → mint → pink. -->
+    <radialGradient id="sphere-body" cx="50%" cy="50%" r="50%" fx="34%" fy="30%">
+      <stop offset="0%" stop-color="#ffffff"></stop>
+      <stop offset="22%" stop-color="#e6fbf6">
+        <animate attributeName="stop-color" values="#e6fbf6;#efe9ff;#ffe9f5;#e6fbf6" dur="9s" repeatCount="indefinite"></animate>
+      </stop>
+      <stop offset="62%" stop-color="#c9bcff">
+        <animate attributeName="stop-color" values="#c9bcff;#9ff0d6;#ffb3dc;#c9bcff" dur="9s" repeatCount="indefinite"></animate>
+      </stop>
+      <stop offset="100%" stop-color="#a99cf0">
+        <animate attributeName="stop-color" values="#a99cf0;#7fd8c0;#f29ac9;#a99cf0" dur="9s" repeatCount="indefinite"></animate>
+      </stop>
     </radialGradient>
-    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"></feGaussianBlur></filter>
+    <radialGradient id="sphere-glow">
+      <stop offset="0%" stop-color="#d8cdff" stop-opacity="0.9"></stop>
+      <stop offset="55%" stop-color="#bff6ec" stop-opacity="0.45"></stop>
+      <stop offset="100%" stop-color="#ffc9e8" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="sphere-rim" cx="50%" cy="50%" r="50%">
+      <stop offset="78%" stop-color="#ffffff" stop-opacity="0"></stop>
+      <stop offset="100%" stop-color="#6f64b8" stop-opacity="0.28"></stop>
+    </radialGradient>
+    <!-- Liquid wobble: animated turbulence displaces the sphere's edge. -->
+    <filter id="wobble" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="4" result="noise">
+        <animate attributeName="baseFrequency" values="0.010;0.018;0.012;0.010" dur="7s" repeatCount="indefinite"></animate>
+        <animate attributeName="seed" values="4;5;6;7;8" dur="10s" repeatCount="indefinite"></animate>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="16" xChannelSelector="R" yChannelSelector="G">
+        <animate attributeName="scale" values="10;22;14;10" dur="5s" repeatCount="indefinite"></animate>
+      </feDisplacementMap>
+    </filter>
+    <filter id="glow-wobble" x="-60%" y="-60%" width="220%" height="220%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008" numOctaves="2" seed="2">
+        <animate attributeName="baseFrequency" values="0.006;0.012;0.008;0.006" dur="8s" repeatCount="indefinite"></animate>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" scale="40" xChannelSelector="R" yChannelSelector="B"></feDisplacementMap>
+      <feGaussianBlur stdDeviation="16"></feGaussianBlur>
+    </filter>
   </defs>
 
-  <circle class="core" r="120" fill="url(#core)" filter="url(#soft)"></circle>
-  <circle class="nucleus" r="46" fill="none"></circle>
+  <g data-sphere>
+    <circle class="glow" r="150" fill="url(#sphere-glow)" filter="url(#glow-wobble)"></circle>
+    <g filter="url(#wobble)">
+      <circle r="64" fill="url(#sphere-body)"></circle>
+      <circle r="64" fill="url(#sphere-rim)"></circle>
+      <ellipse cx="-22" cy="-26" rx="16" ry="10" fill="#ffffff" opacity="0.85" transform="rotate(-30 -22 -26)"></ellipse>
+    </g>
+  </g>
 
   {
     shells.map((s) => (
@@ -76,6 +114,15 @@ const outer = R0 + (works.length - 1) * STEP + 70;
   }
 </svg>
 
+<script>
+  // SMIL animations ignore CSS media queries; pause them for reduced-motion visitors.
+  const svg = document.querySelector<SVGSVGElement>('[data-orbit]');
+  if (svg && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    svg.pauseAnimations();
+    svg.setCurrentTime(0);
+  }
+</script>
+
 <style>
   .orbit {
     width: min(86vmin, 820px);
@@ -87,11 +134,6 @@ const outer = R0 + (works.length - 1) * STEP + 70;
     stroke: var(--ink);
     stroke-width: 1.2;
     opacity: 0.55;
-  }
-  .nucleus {
-    stroke: var(--ink);
-    stroke-width: 1;
-    opacity: 0.35;
   }
   .electron {
     fill: var(--ink);
@@ -122,9 +164,9 @@ const outer = R0 + (works.length - 1) * STEP + 70;
     animation-direction: var(--dir);
     animation-name: spin-back;
   }
-  .core {
+  .glow {
     transform-origin: 0 0;
-    animation: breathe 7s ease-in-out infinite alternate;
+    animation: breathe 6s ease-in-out infinite alternate;
   }
   @keyframes spin {
     to {
@@ -138,18 +180,18 @@ const outer = R0 + (works.length - 1) * STEP + 70;
   }
   @keyframes breathe {
     from {
-      opacity: 0.7;
-      transform: scale(0.92);
+      opacity: 0.65;
+      transform: scale(0.85);
     }
     to {
       opacity: 1;
-      transform: scale(1.06);
+      transform: scale(1.18);
     }
   }
   @media (prefers-reduced-motion: reduce) {
     .shell,
     .tag,
-    .core {
+    .glow {
       animation: none;
     }
   }

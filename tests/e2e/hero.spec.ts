@@ -87,3 +87,24 @@ test('tool labels never sit on top of their dot, at any point in the rotation', 
     expect(hits, `at ${progress * 100}% of the cycle`).toEqual([]);
   }
 });
+
+test.describe('core sphere', () => {
+  test('has no outline ring, is shaded like a sphere, and keeps shimmering', async ({ page }) => {
+    await page.goto('/');
+    const orbit = page.locator('[data-orbit]');
+    await expect(orbit.locator('.nucleus')).toHaveCount(0);
+    await expect(orbit.locator('[data-sphere]')).toHaveCount(1);
+    // Sphere shading: an off-centre highlight in the body gradient.
+    const fx = await orbit.locator('#sphere-body').getAttribute('fx');
+    expect(Number.parseFloat(fx!)).toBeLessThan(50);
+    // Liquid wobble + colour drift run as SVG animations.
+    expect(await orbit.locator('[data-sphere] animate, #wobble animate').count()).toBeGreaterThan(2);
+    expect(await orbit.evaluate((svg: SVGSVGElement) => svg.animationsPaused())).toBe(false);
+  });
+
+  test('stops completely with reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    expect(await page.locator('[data-orbit]').evaluate((svg: SVGSVGElement) => svg.animationsPaused())).toBe(true);
+  });
+});
