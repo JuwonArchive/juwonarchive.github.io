@@ -132,3 +132,25 @@ test('the white crescent reaches well into the sphere (user: stronger white ligh
   // The rest of the sphere stays blue.
   expect(await at(-0.2, 0.2)).toBeLessThan(200);
 });
+
+test.describe('god rays', () => {
+  test('light shafts stream out from the sphere and move', async ({ page }) => {
+    await page.goto('/');
+    const rays = page.locator('[data-orbit] [data-godrays]');
+    await expect(rays).toHaveCount(1);
+    expect(await rays.locator('path').count()).toBeGreaterThanOrEqual(8);
+    expect(await rays.evaluate((el) => getComputedStyle(el).animationName)).not.toBe('none');
+    // Rays are drawn behind the sphere.
+    const order = await page.locator('[data-orbit]').evaluate((svg) => {
+      const all = [...svg.querySelectorAll('[data-godrays], [data-sphere]')];
+      return all.map((e) => (e.hasAttribute('data-godrays') ? 'rays' : 'sphere'));
+    });
+    expect(order).toEqual(['rays', 'sphere']);
+  });
+
+  test('hold still with reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    expect(await page.locator('[data-godrays]').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+  });
+});

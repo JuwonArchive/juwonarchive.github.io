@@ -29,6 +29,21 @@ const shells = works.map((w, i) => {
   };
 });
 const outer = R0 + (works.length - 1) * STEP + 70;
+
+// God rays: wedges from the sphere, gathered toward the upper-right highlight (deterministic "random").
+const rand = (i: number) => {
+  const x = Math.sin(i * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+};
+const rays = Array.from({ length: 16 }, (_, i) => {
+  const main = i < 11;
+  const angle = main ? -45 + (rand(i) - 0.5) * 150 : rand(i + 50) * 360;
+  const half = (main ? 1.5 + rand(i + 9) * 4 : 1 + rand(i + 9) * 2) * (Math.PI / 180);
+  const len = main ? 260 + rand(i + 3) * 200 : 180 + rand(i + 3) * 120;
+  const a = (angle * Math.PI) / 180;
+  const p = (t: number) => `${(Math.cos(t) * len).toFixed(1)} ${(Math.sin(t) * len).toFixed(1)}`;
+  return { d: `M0 0 L${p(a - half)} L${p(a + half)} Z`, opacity: main ? 0.55 + rand(i + 21) * 0.45 : 0.3 };
+});
 ---
 
 <svg class="orbit" data-orbit viewBox={`${-outer} ${-outer} ${outer * 2} ${outer * 2}`} aria-hidden="true">
@@ -88,8 +103,18 @@ const outer = R0 + (works.length - 1) * STEP + 70;
       <stop offset="45%" stop-color="#1e7bff" stop-opacity=".45"></stop>
       <stop offset="100%" stop-color="#1e7bff" stop-opacity="0"></stop>
     </radialGradient>
+    <radialGradient id="ray-fade" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="300">
+      <stop offset="10%" stop-color="#a9dcff" stop-opacity=".95"></stop>
+      <stop offset="45%" stop-color="#6fb6ff" stop-opacity=".4"></stop>
+      <stop offset="85%" stop-color="#6fb6ff" stop-opacity="0"></stop>
+    </radialGradient>
+    <filter id="ray-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
     <filter id="soft-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="20"></feGaussianBlur></filter>
   </defs>
+
+  <g class="godrays" data-godrays fill="url(#ray-fade)" filter="url(#ray-blur)">
+    {rays.map((r) => <path d={r.d} opacity={r.opacity} />)}
+  </g>
 
   <g data-sphere>
     <circle class="glow" data-glow cx="-14" cy="18" r="150" fill="url(#sphere-glow)" filter="url(#soft-glow)"></circle>
@@ -178,6 +203,35 @@ const outer = R0 + (works.length - 1) * STEP + 70;
     animation-direction: var(--dir);
     animation-name: spin-back;
   }
+  /* Light shafts sway a little and breathe, like light through haze. */
+  .godrays {
+    transform-origin: 0 0;
+    animation:
+      sway 16s ease-in-out infinite alternate,
+      flicker 5s ease-in-out infinite alternate;
+  }
+  @keyframes sway {
+    from {
+      transform: rotate(-7deg);
+    }
+    to {
+      transform: rotate(7deg);
+    }
+  }
+  @keyframes flicker {
+    0% {
+      opacity: 0.7;
+    }
+    40% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 0.8;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
   .glow {
     transform-origin: 0 0;
     animation: breathe 6s ease-in-out infinite alternate;
@@ -205,7 +259,8 @@ const outer = R0 + (works.length - 1) * STEP + 70;
   @media (prefers-reduced-motion: reduce) {
     .shell,
     .tag,
-    .glow {
+    .glow,
+    .godrays {
       animation: none;
     }
   }
