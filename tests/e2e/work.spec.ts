@@ -80,3 +80,31 @@ test.describe('work detail', () => {
     }
   });
 });
+
+test.describe('uniform media frames', () => {
+  test('every image, video and embed sits in the same 16:9 frame, at most 1280px wide', async ({ page }) => {
+    for (const w of site.works) {
+      await page.goto(`/works/${w.slug}`);
+      const frames = await page.locator('[data-frame]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+      const mediaCount = w.blocks.filter((b) => ['image', 'video', 'embed'].includes(b.type)).length;
+      expect(frames.length).toBe(mediaCount);
+      const widths = new Set(frames.map((f) => Math.round(f.width)));
+      expect(widths.size).toBeLessThanOrEqual(1);
+      for (const f of frames) {
+        expect(f.width).toBeLessThanOrEqual(1280);
+        expect(Math.abs(f.width / f.height - 16 / 9)).toBeLessThan(0.01);
+      }
+    }
+  });
+
+  test('images are shown whole and open full size on click', async ({ page }) => {
+    const w = site.works.find((x) => x.blocks.some((b) => b.type === 'image'));
+    test.skip(!w, 'no images');
+    await page.goto(`/works/${w!.slug}`);
+    const img = page.locator('[data-frame] img').first();
+    await expect(img).toHaveCSS('object-fit', 'contain');
+    const link = page.locator('a[data-frame]:has(img)').first();
+    await expect(link).toHaveAttribute('href', (await img.getAttribute('src'))!);
+    await expect(link).toHaveAttribute('target', '_blank');
+  });
+});
