@@ -261,3 +261,15 @@ test('phones use smaller halftone dots (user)', async ({ page, isMobile }) => {
   await page.goto('/');
   expect(Number(await page.locator('canvas[data-halftone]').getAttribute('data-max-r'))).toBeLessThanOrEqual(2.5);
 });
+
+test('tighter halftone spacing; darker orbit lines and labels (user)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const dots = page.locator('canvas[data-halftone]');
+  expect(Number(await dots.getAttribute('data-pitch'))).toBeLessThanOrEqual(7);
+  // Dots never touch: diameter stays under the spacing.
+  expect(Number(await dots.getAttribute('data-max-r')) * 2).toBeLessThan(Number(await dots.getAttribute('data-pitch')));
+  const lines = page.locator('canvas[data-trace]');
+  expect(Number(await lines.evaluate((c) => getComputedStyle(c).opacity))).toBeGreaterThanOrEqual(0.85);
+  expect(Number(await lines.getAttribute('data-line-alpha'))).toBeGreaterThanOrEqual(0.8);
+});

@@ -19,7 +19,8 @@ type Opts = {
 type V3 = [number, number, number];
 
 const TAU = Math.PI * 2;
-const PITCH = 9; // halftone cell, CSS px
+const LINE_ALPHA = 0.85; // orbit lines and labels read clearly (user)
+const PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
 function ring(r: number, ax: number, az: number, n = 160, phase = 0): V3[] {
@@ -43,26 +44,10 @@ export function mountOrbitHalftone(opts: Opts) {
   if (!dctx) return;
   dots.dataset.form = 'orbit';
   let field = new Float32Array(0);
-  // Each dot size is pre-rendered once as a softly blurred stamp, then reused every frame.
+  const kx = new Float32Array(256);
+  // Soft edges for free: the dot canvas renders at 0.75× and the browser's upscale blurs it ~0.5px.
   const BLUR = 0.5;
-  const SPRITE_DPR = 2;
-  const stamps = new Map<number, HTMLCanvasElement>();
-  const stamp = (rq: number) => {
-    let c = stamps.get(rq);
-    if (c) return c;
-    const r = rq / 4;
-    const size = Math.ceil((r + BLUR * 3) * 2 * SPRITE_DPR);
-    c = document.createElement('canvas');
-    c.width = c.height = size;
-    const x = c.getContext('2d')!;
-    x.filter = `blur(${BLUR * SPRITE_DPR}px)`;
-    x.fillStyle = opts.dotColor;
-    x.beginPath();
-    x.arc(size / 2, size / 2, r * SPRITE_DPR, 0, TAU);
-    x.fill();
-    stamps.set(rq, c);
-    return c;
-  };
+  const DOT_SCALE = 0.75;
   dots.dataset.blur = String(BLUR);
   // Halftone dots are soft by nature; 1.5× is plenty and cheaper on retina screens.
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -75,10 +60,11 @@ export function mountOrbitHalftone(opts: Opts) {
   const resize = () => {
     w = dots.clientWidth;
     h = dots.clientHeight;
-    for (const c of [dots, lines]) {
-      if (!c) continue;
-      c.width = Math.round(w * dpr);
-      c.height = Math.round(h * dpr);
+    dots.width = Math.round(w * DOT_SCALE);
+    dots.height = Math.round(h * DOT_SCALE);
+    if (lines) {
+      lines.width = Math.round(w * dpr);
+      lines.height = Math.round(h * dpr);
     }
   };
 
@@ -141,11 +127,14 @@ export function mountOrbitHalftone(opts: Opts) {
       const x1 = Math.min(cols - 1, Math.ceil(cxi + rc));
       const y0 = Math.max(0, Math.floor(cyi - rc));
       const y1 = Math.min(rows - 1, Math.ceil(cyi + rc));
-      for (let yy = y0; yy <= y1; yy++)
-        for (let xx = x0; xx <= x1; xx++) {
-          const d2 = (xx - cxi) ** 2 + (yy - cyi) ** 2;
-          field[yy * cols + xx] += amount * Math.exp(-d2 * inv);
-        }
+      // Separable Gaussian: one exp per column and per row instead of per cell.
+      const gx = kx.subarray(0, x1 - x0 + 1);
+      for (let xx = x0; xx <= x1; xx++) gx[xx - x0] = Math.exp(-((xx - cxi) ** 2) * inv);
+      for (let yy = y0; yy <= y1; yy++) {
+        const gy = amount * Math.exp(-((yy - cyi) ** 2) * inv);
+        const row = yy * cols;
+        for (let xx = x0; xx <= x1; xx++) field[row + xx] += gy * gx[xx - x0];
+      }
     };
     const along = (pts: { x: number; y: number }[], amount: (i: number, z: number) => number, radius: number) => {
       for (let i = 1; i < pts.length; i++) {
@@ -177,12 +166,13 @@ export function mountOrbitHalftone(opts: Opts) {
     if (ptr.on > 0.01) splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
     // 2. Halftone screen, batched: dots of similar size/alpha share one path.
-    dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dctx.setTransform(DOT_SCALE, 0, 0, DOT_SCALE, 0, 0);
     dctx.clearRect(0, 0, w, h);
     dctx.fillStyle = opts.dotColor;
     // Smallest dot 1px (no micro-dots), largest 3.4px.
     const MIN_R = 1;
-    const max = w < 768 ? 2.4 : 3.4; // smaller dots on phones
+    // Diameter stays below the 7px spacing so dots never touch; smaller on phones.
+    const max = w < 768 ? 2.2 : 3.0;
     const buckets = new Map<number, number[]>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
@@ -199,14 +189,19 @@ export function mountOrbitHalftone(opts: Opts) {
     for (const [key, list] of buckets) {
       sizes.add(key >> 4);
       dctx.globalAlpha = (key & 15) / 6;
-      const sprite = stamp(key >> 4);
-      const half = sprite.width / SPRITE_DPR / 2;
-      for (let i = 0; i < list.length; i += 2) dctx.drawImage(sprite, list[i] - half, list[i + 1] - half, half * 2, half * 2);
+      const r = (key >> 4) / 4;
+      const path = new Path2D();
+      for (let i = 0; i < list.length; i += 2) {
+        path.moveTo(list[i] + r, list[i + 1]);
+        path.arc(list[i], list[i + 1], r, 0, TAU);
+      }
+      dctx.fill(path);
     }
     dctx.globalAlpha = 1;
     dots.dataset.sizeSteps = String(sizes.size);
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
+    dots.dataset.pitch = String(PITCH);
     dots.dataset.readback = 'none';
     dots.dataset.cx = String(Math.round(g.cx));
 
@@ -216,7 +211,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.clearRect(0, 0, w, h);
       lctx.strokeStyle = lctx.fillStyle = opts.lineColor;
       lctx.lineWidth = 0.8;
-      lctx.globalAlpha = 0.55;
+      lctx.globalAlpha = LINE_ALPHA;
       lctx.beginPath();
       lctx.arc(g.cx, g.cy, g.R, 0, TAU);
       lctx.stroke();
@@ -226,12 +221,12 @@ export function mountOrbitHalftone(opts: Opts) {
       for (const o of g.dashed) stroke(lctx, o);
       lctx.setLineDash([]);
       // Thin latitude/longitude wireframe gives the sphere its form.
-      lctx.globalAlpha = 0.16;
+      lctx.globalAlpha = 0.3;
       lctx.lineWidth = 0.6;
       for (const o of g.wire) stroke(lctx, o);
       lines.dataset.wire = 'latlong';
       // Dotted straight guides through the centre: axes and diagonals.
-      lctx.globalAlpha = 0.5;
+      lctx.globalAlpha = 0.7;
       lctx.setLineDash([1, 4]);
       let dotted = 0;
       for (const ang of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
@@ -245,7 +240,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.setLineDash([]);
       lines.dataset.dotted = String(dotted);
       lctx.lineWidth = 0.8;
-      lctx.globalAlpha = 0.55;
+      lctx.globalAlpha = LINE_ALPHA;
       // Ticks at the four cardinal points.
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         lctx.beginPath();
@@ -264,7 +259,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.arc(g.cx, g.cy, 7, 0, TAU);
       lctx.stroke();
       // Markers travel along the orbits.
-      lctx.globalAlpha = 0.85;
+      lctx.globalAlpha = 1;
       lctx.font = '10px "Geist Mono Variable", ui-monospace, monospace';
       const shown: string[] = [];
       opts.labels.forEach((label, i) => {
@@ -294,6 +289,7 @@ export function mountOrbitHalftone(opts: Opts) {
       });
       lctx.globalAlpha = 1;
       lines.dataset.labels = JSON.stringify(shown);
+      lines.dataset.lineAlpha = String(LINE_ALPHA);
     }
     dots.dataset.cy = String(Math.round(g.cy));
     dots.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
