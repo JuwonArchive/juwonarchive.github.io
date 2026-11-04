@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { trackErrors } from './helpers';
+import { readFileSync } from 'node:fs';
 
 /** Mean alpha of the halftone canvas in a square around (x, y) in CSS px. */
 async function inkAround(page: Page, x: number, y: number, half = 40) {
@@ -33,7 +34,7 @@ test.describe('home graphics', () => {
     expect(errors).toEqual([]);
   });
 
-  test('orbit line art rendered through a halftone screen', async ({ page, isMobile }) => {
+  test('orbit line art rendered through a halftone screen', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const canvas = page.locator('canvas[data-halftone]');
@@ -63,15 +64,31 @@ test.describe('home graphics', () => {
     // the pointer test below covers the reveal.
   });
 
-  test('crisp line art on top carries tool-name labels', async ({ page }) => {
+  test('markers carry the archive boxes: same numbers and names, and lead to the box (user: 1)', async ({ page, isMobile }) => {
+    const site = JSON.parse(readFileSync('src/data/site.json', 'utf8')) as { works: { titleEn: string; slug: string }[] };
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const lines = page.locator('canvas[data-trace]');
     expect(await lines.evaluate((c) => getComputedStyle(c).filter)).toBe('none');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(400);
     const labels = JSON.parse((await lines.getAttribute('data-labels'))!) as string[];
-    expect(labels.length).toBeGreaterThanOrEqual(5);
-    for (const l of labels) expect(l).toMatch(/^[\x20-\x7E]+$/);
-    expect(labels.map((l) => l.toUpperCase())).toContain('BLENDER');
+    expect(labels).toEqual(site.works.map((w, i) => `${String(i + 1).padStart(2, '0')} ${w.titleEn}`.toUpperCase()));
+    // Clicking the first marker opens its archive box.
+    const hit = await page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>('canvas[data-trace]')!;
+      return JSON.parse(c.dataset.hits ?? '[]')[0] as { x: number; y: number };
+    });
+    test.skip(isMobile, 'tap target checked on desktop');
+    await page.mouse.click(hit.x, hit.y);
+    await expect(page).toHaveURL(new RegExp(`/archive/${site.works[0].slug}/?$`));
+  });
+
+  test('sphere outline and grid use the acrylic box edge colour; glass body; orbits stay black (user: 3)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await page.waitForTimeout(300);
+    await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-edge-color', '#28345a');
+    await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-glass', 'acrylic');
   });
 
   test('on phones the sphere fits between the top bar and JUWON (user: A on mobile)', async ({ page, isMobile }) => {
@@ -274,7 +291,8 @@ test('desktop: smaller JUWON sits left, just above the info line (user: B)', asy
   await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
   const r = await juwonBox(page);
   expect(Math.abs(r.left - r.subLeft)).toBeLessThan(12);
-  expect(r.right - r.left).toBeLessThan(r.vw * 0.4);
+  expect(r.right - r.left).toBeLessThan(r.vw * 0.42);
+  expect(r.right - r.left).toBeGreaterThan(r.vw * 0.33); // a little bigger than before (user)
   expect(r.bottom).toBeLessThanOrEqual(r.subTop + 2);
   expect(r.subTop - r.bottom).toBeLessThan(40);
 });

@@ -13,6 +13,8 @@ type Opts = {
   dotColor: string;
   lineColor: string;
   labels: string[];
+  /** Where each labelled marker leads (same order as labels): the matching archive box. */
+  links?: string[];
   reducedMotion: boolean;
   /** full: halftone everywhere along the drawing · subtle: faint along orbits, revealed by the pointer · none: line art only */
   mode?: 'full' | 'subtle' | 'none';
@@ -25,6 +27,9 @@ type V3 = [number, number, number];
 const TAU = Math.PI * 2;
 const LINE_ALPHA = 0.85; // orbit lines and labels read clearly (user)
 const PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
+// Acrylic edge colour of the archive boxes: the sphere's outline and grid share it (user: 3).
+const EDGE = '#28345a';
+const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
 function ring(r: number, ax: number, az: number, n = 160, phase = 0): V3[] {
@@ -128,6 +133,29 @@ export function mountOrbitHalftone(opts: Opts) {
     ctx.stroke();
   };
 
+  // Clickable areas (marker + label) for the current frame, page coordinates relative to the canvas.
+  const hits: { x0: number; x1: number; y0: number; y1: number; href: string }[] = [];
+  const hitAt = (clientX: number, clientY: number) => {
+    const r = dots.getBoundingClientRect();
+    const x = clientX - r.left;
+    const y = clientY - r.top;
+    return hits.find((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+  };
+  const interactive = (el: EventTarget | null) => el instanceof Element && el.closest('a, button, input, [data-home-nav]');
+  window.addEventListener('click', (e) => {
+    if (e.button !== 0 || interactive(e.target)) return;
+    const hit = hitAt(e.clientX, e.clientY);
+    if (hit) window.location.href = hit.href;
+  });
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      const over = !interactive(e.target) && !!hitAt(e.clientX, e.clientY);
+      document.documentElement.style.cursor = over ? 'pointer' : '';
+    },
+    { passive: true },
+  );
+
   const draw = (t: number) => {
     const g = geometry(t);
 
@@ -192,6 +220,16 @@ export function mountOrbitHalftone(opts: Opts) {
     // 2. Halftone screen, batched: dots of similar size/alpha share one path.
     dctx.setTransform(DOT_SCALE, 0, 0, DOT_SCALE, 0, 0);
     dctx.clearRect(0, 0, w, h);
+    // Frosted acrylic body, the same glass gradient as the archive boxes.
+    const glass = dctx.createLinearGradient(g.cx - g.R, g.cy - g.R, g.cx + g.R, g.cy + g.R);
+    glass.addColorStop(0, 'rgba(232, 236, 245, 0.55)');
+    glass.addColorStop(0.45, 'rgba(214, 221, 236, 0.22)');
+    glass.addColorStop(1, 'rgba(236, 240, 248, 0.5)');
+    dctx.fillStyle = glass;
+    dctx.beginPath();
+    dctx.arc(g.cx, g.cy, g.R, 0, TAU);
+    dctx.fill();
+    dots.dataset.glass = 'acrylic';
     dctx.fillStyle = opts.dotColor;
     // Smallest dot 1px (no micro-dots), largest 3.4px.
     const MIN_R = 1;
@@ -242,24 +280,35 @@ export function mountOrbitHalftone(opts: Opts) {
     if (lctx && lines) {
       lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       lctx.clearRect(0, 0, w, h);
-      lctx.strokeStyle = lctx.fillStyle = opts.lineColor;
       lctx.lineWidth = 0.8;
-      lctx.globalAlpha = LINE_ALPHA;
+      // Acrylic edge: a pale outline with a white inner rim, like the boxes' glass.
+      lctx.strokeStyle = '#ffffff';
+      lctx.globalAlpha = 0.9;
+      lctx.beginPath();
+      lctx.arc(g.cx, g.cy, g.R - 1.5, 0, TAU);
+      lctx.stroke();
+      lctx.strokeStyle = lctx.fillStyle = EDGE;
+      lctx.globalAlpha = 0.4;
       lctx.beginPath();
       lctx.arc(g.cx, g.cy, g.R, 0, TAU);
       lctx.stroke();
-      for (const o of g.orbits) stroke(lctx, o);
+      lines.dataset.edgeColor = EDGE;
       for (const o of g.centre) stroke(lctx, o);
       lctx.setLineDash([2, 4]);
       for (const o of g.dashed) stroke(lctx, o);
       lctx.setLineDash([]);
+      // The orbits alone stay black.
+      lctx.strokeStyle = opts.lineColor;
+      lctx.globalAlpha = LINE_ALPHA;
+      for (const o of g.orbits) stroke(lctx, o);
+      lctx.strokeStyle = EDGE;
       // Thin latitude/longitude wireframe gives the sphere its form.
-      lctx.globalAlpha = 0.3;
+      lctx.globalAlpha = 0.22;
       lctx.lineWidth = 0.6;
       for (const o of g.wire) stroke(lctx, o);
       lines.dataset.wire = 'latlong';
       // Dotted straight guides through the centre: axes and diagonals.
-      lctx.globalAlpha = 0.7;
+      lctx.globalAlpha = 0.4;
       lctx.setLineDash([1, 4]);
       let dotted = 0;
       for (const ang of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
@@ -273,7 +322,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.setLineDash([]);
       lines.dataset.dotted = String(dotted);
       lctx.lineWidth = 0.8;
-      lctx.globalAlpha = LINE_ALPHA;
+      lctx.globalAlpha = 0.45;
       // Ticks at the four cardinal points.
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         lctx.beginPath();
@@ -291,8 +340,10 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.beginPath();
       lctx.arc(g.cx, g.cy, 7, 0, TAU);
       lctx.stroke();
-      // Markers travel along the orbits.
+      // Markers travel along the orbits: one per archive box, numbered like the boxes.
       lctx.globalAlpha = 1;
+      lctx.fillStyle = opts.lineColor;
+      hits.length = 0;
       lctx.font = '10px "Geist Mono Variable", ui-monospace, monospace';
       const shown: string[] = [];
       opts.labels.forEach((label, i) => {
@@ -312,16 +363,34 @@ export function mountOrbitHalftone(opts: Opts) {
         lctx.lineTo(p.x + Math.cos(ang - 2.6) * 6 + Math.cos(ang) * 12, p.y + Math.sin(ang - 2.6) * 6 + Math.sin(ang) * 12);
         lctx.closePath();
         lctx.fill();
-        const text = label.toUpperCase();
+        // "01  3D DESIGN": muted number, ink title — the same caption as the box.
+        const [num, ...rest] = label.toUpperCase().split(' ');
+        const title = rest.join(' ');
+        const numText = title ? `${num}  ` : '';
+        const nw = lctx.measureText(numText).width;
+        const tw = nw + lctx.measureText(title || num).width;
         // Keep labels on screen: flip to the side with room.
-        const tw = lctx.measureText(text).width;
         const right = p.x >= g.cx ? p.x + 10 + tw < w - 8 : p.x - 10 - tw < 8;
-        lctx.textAlign = right ? 'left' : 'right';
-        lctx.fillText(text, p.x + (right ? 10 : -10), p.y - 8);
+        const x0 = right ? p.x + 10 : p.x - 10 - tw;
+        lctx.textAlign = 'left';
+        // Thin white halo so orbit lines never cut through the caption.
+        lctx.strokeStyle = '#ffffff';
+        lctx.lineWidth = 3;
+        lctx.lineJoin = 'round';
+        lctx.strokeText(numText + (title || num), x0, p.y - 8);
+        lctx.fillStyle = MUTED;
+        lctx.fillText(numText, x0, p.y - 8);
+        lctx.fillStyle = opts.lineColor;
+        lctx.fillText(title || num, x0 + nw, p.y - 8);
+        const href = opts.links?.[i];
+        if (href) hits.push({ x0: Math.min(p.x - 8, x0 - 4), x1: Math.max(p.x + 8, x0 + tw + 4), y0: p.y - 22, y1: p.y + 8, href });
         shown.push(label);
       });
       lctx.globalAlpha = 1;
       lines.dataset.labels = JSON.stringify(shown);
+      // Marker centres in viewport coordinates, for tests.
+      const cr = dots.getBoundingClientRect();
+      lines.dataset.hits = JSON.stringify(hits.map((b) => ({ x: Math.round(cr.left + (b.x0 + b.x1) / 2), y: Math.round(cr.top + b.y1 - 8) })));
       lines.dataset.lineAlpha = String(LINE_ALPHA);
     }
     dots.dataset.cy = String(Math.round(g.cy));

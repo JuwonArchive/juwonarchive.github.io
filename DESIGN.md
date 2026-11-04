@@ -176,3 +176,9 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - Tints are icy (ice, frost, mist, steel). No warm tones anywhere.
 - Home: JUWON at the bottom; a small mono top bar (label left, visitor's local time right). Behind, a 3D orbital line drawing (tilted orbits, dashed meridians, centre ellipses) is read through a halftone screen — variant ③: faint along the orbits at rest, revealed in a soft circle around the pointer (`#E6EBF0` dots 1–3px on a 7px grid, no background micro-dots; ink field computed on the CPU, no GPU readback), with a crisp thin version on top whose markers carry the tool names. Rotates slowly, turns toward the pointer, Plain white, no fog.
 - Home layout (2026-11-04): phones keep JUWON big and centred at the bottom with the sphere fitted in the band between the top bar and JUWON; desktop puts a smaller JUWON (clamp(40px, 6.2vw, 96px)) bottom-left just above the info line, with the sphere centred on the page at radius min(17vw, 28vh); on phones the sphere radius is at most 24vw.
+
+## Home ↔ Archive link (2026-11-04)
+
+- The orbit markers are the archive boxes: `01 3D DESIGN` … (muted number, ink title, the same caption as the box) and each one opens its box.
+- The sphere borrows the boxes' acrylic: a frosted glass gradient inside, a white inner rim, and outline/grid/guides in the box edge colour `#28345A` at low opacity. Only the three orbits stay ink.
+- Desktop JUWON (bottom-left, above the info line) is `clamp(48px, 8vw, 132px)`.

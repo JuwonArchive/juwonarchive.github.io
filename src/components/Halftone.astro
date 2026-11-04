@@ -1,12 +1,15 @@
 ---
 /** Home artwork: 3D orbital line art read through a halftone screen, with crisp labelled line art on top. */
 import { loadSite } from '../data/load';
-const ascii = (t: string) => /^[\x20-\x7E]+$/.test(t);
-const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))].slice(0, 9);
+// One marker per archive box, numbered and named like the box, leading to it (user: 1).
+const markers = loadSite().works.map((w, i) => ({
+  label: `${String(i + 1).padStart(2, '0')} ${w.titleEn}`.toUpperCase(),
+  href: `/archive/${w.slug}`,
+}));
 ---
 
 <canvas class="halftone" data-halftone aria-hidden="true"></canvas>
-<canvas class="trace" data-trace data-tools={JSON.stringify(tools)} aria-hidden="true"></canvas>
+<canvas class="trace" data-trace data-markers={JSON.stringify(markers)} aria-hidden="true"></canvas>
 
 <script>
   import { mountOrbitHalftone } from '../scripts/orbit-halftone';
@@ -14,6 +17,7 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
   const lines = document.querySelector<HTMLCanvasElement>('canvas[data-trace]');
   const above = document.querySelector<HTMLElement>('.home .top');
   const below = document.querySelector<HTMLElement>('.home h1');
+  const markers: { label: string; href: string }[] = JSON.parse(lines?.dataset.markers ?? '[]');
   if (dots) {
     mountOrbitHalftone({
       band: above && below ? { above, below } : null, // phones: sphere sits above JUWON (user: A)
@@ -21,7 +25,8 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
       lines,
       dotColor: '#e6ebf0',
       lineColor: '#111111',
-      labels: JSON.parse(lines?.dataset.tools ?? '[]'),
+      labels: markers.map((m) => m.label),
+      links: markers.map((m) => m.href),
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       mode: 'subtle', // faint along the orbits; the pointer reveals the halftone (user choice ③)
     });
