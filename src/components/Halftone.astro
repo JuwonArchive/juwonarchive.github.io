@@ -12,8 +12,11 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
   import { mountOrbitHalftone } from '../scripts/orbit-halftone';
   const dots = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
   const lines = document.querySelector<HTMLCanvasElement>('canvas[data-trace]');
+  const above = document.querySelector<HTMLElement>('.home .top');
+  const below = document.querySelector<HTMLElement>('.home h1');
   if (dots) {
     mountOrbitHalftone({
+      band: above && below ? { above, below } : null, // phones: sphere sits above JUWON (user: A)
       dots,
       lines,
       dotColor: '#e6ebf0',

@@ -16,6 +16,8 @@ type Opts = {
   reducedMotion: boolean;
   /** full: halftone everywhere along the drawing · subtle: faint along orbits, revealed by the pointer · none: line art only */
   mode?: 'full' | 'subtle' | 'none';
+  /** Phones: keep the sphere in the free band between these two elements (top bar and JUWON). */
+  band?: { above: HTMLElement; below: HTMLElement } | null;
 };
 
 type V3 = [number, number, number];
@@ -59,9 +61,18 @@ export function mountOrbitHalftone(opts: Opts) {
   const ptr = { x: -9999, y: -9999, tx: -9999, ty: -9999, on: 0, ton: 0 };
   dots.dataset.dotColor = opts.dotColor;
 
+  // Phone band (canvas coordinates) the sphere must fit in; null = whole canvas.
+  let band: { top: number; bottom: number } | null = null;
   const resize = () => {
     w = dots.clientWidth;
     h = dots.clientHeight;
+    band = null;
+    if (opts.band && w < 768) {
+      const c = dots.getBoundingClientRect();
+      const top = opts.band.above.getBoundingClientRect().bottom - c.top + 16;
+      const bottom = opts.band.below.getBoundingClientRect().top - c.top - 20;
+      if (bottom - top > 120) band = { top, bottom };
+    }
     dots.width = Math.round(w * DOT_SCALE);
     dots.height = Math.round(h * DOT_SCALE);
     if (lines) {
@@ -72,9 +83,15 @@ export function mountOrbitHalftone(opts: Opts) {
 
   const geometry = (t: number) => {
     const mobile = w < 768;
-    const R = mobile ? w * 0.44 : Math.min(w * 0.24, h * 0.38);
-    const cx = w * 0.5; // centred
-    const cy = h * 0.5; // centred on phones and desktop
+    // Phones (A): the sphere fills the band above JUWON. Desktop (B): centred, a little smaller.
+    // 1.12 leaves room for perspective swell and the outer orbits.
+    const R = band
+      ? Math.min((band.bottom - band.top) / 2 / 1.12, w * 0.44)
+      : mobile
+        ? w * 0.44
+        : Math.min(w * 0.21, h * 0.34);
+    const cx = w * 0.5;
+    const cy = band ? (band.top + band.bottom) / 2 : h * 0.5;
     const yaw = pose.yaw + t * 0.08;
     const pitch = 0.32 + pose.pitch;
     const [cy_, sy_, cp, sp] = [Math.cos(yaw), Math.sin(yaw), Math.cos(pitch), Math.sin(pitch)];
@@ -308,14 +325,18 @@ export function mountOrbitHalftone(opts: Opts) {
       lines.dataset.lineAlpha = String(LINE_ALPHA);
     }
     dots.dataset.cy = String(Math.round(g.cy));
+    dots.dataset.r = String(Math.round(g.R));
     dots.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
   };
 
   resize();
-  new ResizeObserver(() => {
+  const ro = new ResizeObserver(() => {
     resize();
     if (opts.reducedMotion) draw(0);
-  }).observe(dots);
+  });
+  ro.observe(dots);
+  // JUWON's height changes when the display font loads.
+  if (opts.band) ro.observe(opts.band.below);
 
   if (opts.reducedMotion) {
     dots.toggleAttribute('data-static', true);

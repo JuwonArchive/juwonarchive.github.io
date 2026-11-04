@@ -74,13 +74,23 @@ test.describe('home graphics', () => {
     expect(labels.map((l) => l.toUpperCase())).toContain('BLENDER');
   });
 
-  test('on phones the sphere sits in the vertical middle (user)', async ({ page, isMobile }) => {
+  test('on phones the sphere fits between the top bar and JUWON (user: A on mobile)', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    const cy = Number(await page.locator('canvas[data-halftone]').getAttribute('data-cy'));
-    const h = page.viewportSize()!.height;
-    expect(Math.abs(cy - h / 2)).toBeLessThan(h * 0.05);
+    await page.waitForTimeout(300);
+    const g = await page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+      const b = c.getBoundingClientRect();
+      return {
+        cy: b.top + Number(c.dataset.cy),
+        r: Number(c.dataset.r),
+        top: document.querySelector('.home .top')!.getBoundingClientRect().bottom,
+        h1: document.querySelector('.home h1')!.getBoundingClientRect().top,
+      };
+    });
+    expect(g.cy - g.r).toBeGreaterThan(g.top);
+    expect(g.cy + g.r).toBeLessThan(g.h1);
   });
 
   test('dot sizes vary continuously (not one size)', async ({ page }) => {
@@ -115,16 +125,6 @@ test.describe('home graphics', () => {
     const color = (await page.locator('canvas[data-halftone]').getAttribute('data-dot-color'))!;
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
     expect((r + g + b) / 3).toBeGreaterThan(215); // paler again (user)
-  });
-
-  test('the artwork may run behind JUWON (no cut-off zone)', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'on phones the sphere is centred (user)');
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
-    const h1 = (await page.locator('h1').boundingBox())!;
-    let ink = 0;
-    for (const fx of [0.3, 0.5, 0.7]) ink += await inkAround(page, h1.x + h1.width * fx, h1.y + h1.height * 0.2, 40);
-    expect(ink).toBeGreaterThan(3);
   });
 
   test('the orbits turn toward the pointer', async ({ page, isMobile }) => {
@@ -232,29 +232,48 @@ test('halftone has a very slight blur (user)', async ({ page }) => {
   expect(px).toBeLessThanOrEqual(0.8);
 });
 
-test('graphic is centred on both axes, desktop and phone (user)', async ({ page }) => {
+test('graphic is centred on both axes on desktop, a little smaller (user: B)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'phones fit the sphere above JUWON');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const r = await page.evaluate(() => {
     const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
     const b = c.getBoundingClientRect();
-    return { x: b.left + Number(c.dataset.cx), y: b.top + Number(c.dataset.cy), w: innerWidth, h: innerHeight };
+    return { x: b.left + Number(c.dataset.cx), y: b.top + Number(c.dataset.cy), r: Number(c.dataset.r), w: innerWidth, h: innerHeight };
   });
   expect(Math.abs(r.x - r.w / 2)).toBeLessThanOrEqual(1);
   expect(Math.abs(r.y - r.h / 2)).toBeLessThanOrEqual(1);
+  expect(r.r).toBeLessThanOrEqual(Math.min(r.w * 0.21, r.h * 0.34) + 1);
 });
 
-test('JUWON is centred (user)', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
-  const r = await page.evaluate(() => {
+const juwonBox = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => {
     const h1 = document.querySelector('.home h1')!;
     const range = document.createRange();
     range.selectNodeContents(h1);
     const b = range.getBoundingClientRect();
-    return { mid: b.left + b.width / 2, vw: document.documentElement.clientWidth };
+    const sub = document.querySelector('[data-subline]')!.getBoundingClientRect();
+    return { left: b.left, right: b.right, bottom: b.bottom, mid: b.left + b.width / 2, vw: document.documentElement.clientWidth, subLeft: sub.left, subTop: sub.top };
   });
+
+test('phones: JUWON is big and centred (user: A on mobile)', async ({ page, isMobile }) => {
+  test.skip(!isMobile);
+  await page.goto('/');
+  await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
+  const r = await juwonBox(page);
   expect(Math.abs(r.mid - r.vw / 2)).toBeLessThan(6);
+  expect(r.right - r.left).toBeGreaterThan(r.vw * 0.8);
+});
+
+test('desktop: smaller JUWON sits left, just above the info line (user: B)', async ({ page, isMobile }) => {
+  test.skip(isMobile);
+  await page.goto('/');
+  await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
+  const r = await juwonBox(page);
+  expect(Math.abs(r.left - r.subLeft)).toBeLessThan(12);
+  expect(r.right - r.left).toBeLessThan(r.vw * 0.4);
+  expect(r.bottom).toBeLessThanOrEqual(r.subTop + 2);
+  expect(r.subTop - r.bottom).toBeLessThan(40);
 });
 
 test('phones use smaller halftone dots (user)', async ({ page, isMobile }) => {

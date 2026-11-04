@@ -89,7 +89,23 @@ const site = loadSite();
     /* JUWON's W and O are wider than average, so budget ~0.98em per glyph. */
     --fit-max: 360px;
     --fit-width: (100vw - 2 * var(--gutter)) * 0.86 / 0.98;
-    text-align: center; /* centred (user) */
+    text-align: center; /* phones: big and centred (user: A) */
+  }
+  /* Desktop (user: B): a smaller JUWON sits bottom-left, just above the info line,
+     leaving the centre to the orbit graphic. */
+  @media (min-width: 768px) {
+    .headline {
+      position: absolute;
+      left: var(--gutter);
+      bottom: calc(var(--gutter) + 34px);
+      margin: 0;
+      text-align: left;
+      font-size: clamp(40px, 6.2vw, 96px);
+      line-height: 0.9;
+    }
+    .subline {
+      max-width: 34ch;
+    }
   }
   .bar {
     position: relative;
