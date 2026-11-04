@@ -59,7 +59,8 @@ test.describe('home graphics', () => {
     });
     expect(share.inked).toBeGreaterThan(0.1);
     expect(share.inked).toBeLessThan(0.75);
-    expect(share.dense).toBeGreaterThan(0.01); // dots swell where orbits cross
+    // Variant ③: at rest the halftone is faint along the orbits (no dense areas required);
+    // the pointer test below covers the reveal.
   });
 
   test('crisp line art on top carries tool-name labels', async ({ page }) => {
@@ -87,7 +88,8 @@ test.describe('home graphics', () => {
     await page.goto('/');
     const sizes = Number(await page.locator('canvas[data-halftone]').getAttribute('data-size-steps'));
     // Phones span 1–2.4px (user asked for smaller dots), so fewer quarter-pixel steps exist.
-    expect(sizes).toBeGreaterThanOrEqual(page.viewportSize()!.width < 768 ? 6 : 8);
+    // At rest (variant ③) sizes still vary along the orbits, over a narrower range.
+    expect(sizes).toBeGreaterThanOrEqual(5);
   });
 
   test('dots swell around the pointer', async ({ page, isMobile }) => {
@@ -272,4 +274,9 @@ test('tighter halftone spacing; darker orbit lines and labels (user)', async ({ 
   const lines = page.locator('canvas[data-trace]');
   expect(Number(await lines.evaluate((c) => getComputedStyle(c).opacity))).toBeGreaterThanOrEqual(0.85);
   expect(Number(await lines.getAttribute('data-line-alpha'))).toBeGreaterThanOrEqual(0.8);
+});
+
+test('halftone is the subtle variant: faint at rest, revealed by the pointer (user choice ③)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-mode', 'subtle');
 });

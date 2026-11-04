@@ -20,6 +20,7 @@ const tools = [...new Set(loadSite().works.flatMap((w) => w.tags).filter(ascii))
       lineColor: '#111111',
       labels: JSON.parse(lines?.dataset.tools ?? '[]'),
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      mode: 'subtle', // faint along the orbits; the pointer reveals the halftone (user choice ③)
     });
   }
 </script>

@@ -14,6 +14,8 @@ type Opts = {
   lineColor: string;
   labels: string[];
   reducedMotion: boolean;
+  /** full: halftone everywhere along the drawing · subtle: faint along orbits, revealed by the pointer · none: line art only */
+  mode?: 'full' | 'subtle' | 'none';
 };
 
 type V3 = [number, number, number];
@@ -148,7 +150,10 @@ export function mountOrbitHalftone(opts: Opts) {
       }
     };
     const silhouette = Array.from({ length: 121 }, (_, i) => ({ x: g.cx + Math.cos((i / 120) * TAU) * g.R, y: g.cy + Math.sin((i / 120) * TAU) * g.R }));
-    along(silhouette, () => 0.4, 7);
+    const mode = opts.mode ?? 'subtle';
+    dots.dataset.mode = mode;
+    const subtle = mode === 'subtle';
+    if (!subtle) along(silhouette, () => 0.4, 7);
     // Orbits: darker in front, fainter behind, with a slow pulse travelling along each line.
     g.orbits.forEach((o, oi) =>
       along(
@@ -160,10 +165,12 @@ export function mountOrbitHalftone(opts: Opts) {
         7.5,
       ),
     );
-    for (const o of g.centre) along(o, () => 0.3, 6);
-    for (const o of g.dashed) along(o, () => 0.12, 6);
+    if (!subtle) {
+      for (const o of g.centre) along(o, () => 0.3, 6);
+      for (const o of g.dashed) along(o, () => 0.12, 6);
+    }
     // Pointer: a soft swell under the cursor.
-    if (ptr.on > 0.01) splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
+    if (ptr.on > 0.01 && mode === 'full') splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
     // 2. Halftone screen, batched: dots of similar size/alpha share one path.
     dctx.setTransform(DOT_SCALE, 0, 0, DOT_SCALE, 0, 0);
@@ -176,7 +183,16 @@ export function mountOrbitHalftone(opts: Opts) {
     const buckets = new Map<number, number[]>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
-        const a = Math.min(1, field[yy * cols + xx]);
+        let a = Math.min(1, field[yy * cols + xx]);
+        if (mode === 'none') continue;
+        if (subtle) {
+          // Faint along the orbits; the pointer reveals the halftone around it.
+          const px = xx * PITCH + PITCH / 2 - ptr.x;
+          const py = yy * PITCH + PITCH / 2 - ptr.y;
+          const reveal = ptr.on * Math.exp(-(px * px + py * py) / (2 * 110 * 110));
+          a = a * (0.75 + 1.2 * reveal) + 0.55 * reveal;
+          a = Math.min(1, a);
+        }
         if (a < 0.12) continue;
         const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow((a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
         const aq = Math.round((0.45 + 0.55 * a) * 6); // 6 alpha steps
