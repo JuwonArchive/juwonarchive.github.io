@@ -83,14 +83,6 @@ test.describe('home graphics', () => {
     await expect(page).toHaveURL(new RegExp(`/archive/${site.works[0].slug}/?$`));
   });
 
-  test('sphere outline and grid use the acrylic box edge colour; glass body; orbits stay black (user: 3)', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
-    await page.waitForTimeout(300);
-    await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-edge-color', '#28345a');
-    await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-glass', 'acrylic');
-  });
-
   test('on phones the sphere fits between the top bar and JUWON (user: A on mobile)', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout');
     await page.emulateMedia({ reducedMotion: 'reduce' });

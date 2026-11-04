@@ -180,5 +180,5 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 ## Home ↔ Archive link (2026-11-04)
 
 - The orbit markers are the archive boxes: `01 3D DESIGN` … (muted number, ink title, the same caption as the box) and each one opens its box.
-- The sphere borrows the boxes' acrylic: a frosted glass gradient inside, a white inner rim, and outline/grid/guides in the box edge colour `#28345A` at low opacity. Only the three orbits stay ink.
+- The sphere keeps its original ink line art (an acrylic glass / box-edge-colour variant was tried and reverted, user).
 - Desktop JUWON (bottom-left, above the info line) is `clamp(48px, 8vw, 132px)`.

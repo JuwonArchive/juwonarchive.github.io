@@ -27,8 +27,6 @@ type V3 = [number, number, number];
 const TAU = Math.PI * 2;
 const LINE_ALPHA = 0.85; // orbit lines and labels read clearly (user)
 const PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
-// Acrylic edge colour of the archive boxes: the sphere's outline and grid share it (user: 3).
-const EDGE = '#28345a';
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -220,16 +218,6 @@ export function mountOrbitHalftone(opts: Opts) {
     // 2. Halftone screen, batched: dots of similar size/alpha share one path.
     dctx.setTransform(DOT_SCALE, 0, 0, DOT_SCALE, 0, 0);
     dctx.clearRect(0, 0, w, h);
-    // Frosted acrylic body, the same glass gradient as the archive boxes.
-    const glass = dctx.createLinearGradient(g.cx - g.R, g.cy - g.R, g.cx + g.R, g.cy + g.R);
-    glass.addColorStop(0, 'rgba(232, 236, 245, 0.55)');
-    glass.addColorStop(0.45, 'rgba(214, 221, 236, 0.22)');
-    glass.addColorStop(1, 'rgba(236, 240, 248, 0.5)');
-    dctx.fillStyle = glass;
-    dctx.beginPath();
-    dctx.arc(g.cx, g.cy, g.R, 0, TAU);
-    dctx.fill();
-    dots.dataset.glass = 'acrylic';
     dctx.fillStyle = opts.dotColor;
     // Smallest dot 1px (no micro-dots), largest 3.4px.
     const MIN_R = 1;
@@ -280,35 +268,24 @@ export function mountOrbitHalftone(opts: Opts) {
     if (lctx && lines) {
       lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       lctx.clearRect(0, 0, w, h);
+      lctx.strokeStyle = lctx.fillStyle = opts.lineColor;
       lctx.lineWidth = 0.8;
-      // Acrylic edge: a pale outline with a white inner rim, like the boxes' glass.
-      lctx.strokeStyle = '#ffffff';
-      lctx.globalAlpha = 0.9;
-      lctx.beginPath();
-      lctx.arc(g.cx, g.cy, g.R - 1.5, 0, TAU);
-      lctx.stroke();
-      lctx.strokeStyle = lctx.fillStyle = EDGE;
-      lctx.globalAlpha = 0.4;
+      lctx.globalAlpha = LINE_ALPHA;
       lctx.beginPath();
       lctx.arc(g.cx, g.cy, g.R, 0, TAU);
       lctx.stroke();
-      lines.dataset.edgeColor = EDGE;
+      for (const o of g.orbits) stroke(lctx, o);
       for (const o of g.centre) stroke(lctx, o);
       lctx.setLineDash([2, 4]);
       for (const o of g.dashed) stroke(lctx, o);
       lctx.setLineDash([]);
-      // The orbits alone stay black.
-      lctx.strokeStyle = opts.lineColor;
-      lctx.globalAlpha = LINE_ALPHA;
-      for (const o of g.orbits) stroke(lctx, o);
-      lctx.strokeStyle = EDGE;
       // Thin latitude/longitude wireframe gives the sphere its form.
-      lctx.globalAlpha = 0.22;
+      lctx.globalAlpha = 0.3;
       lctx.lineWidth = 0.6;
       for (const o of g.wire) stroke(lctx, o);
       lines.dataset.wire = 'latlong';
       // Dotted straight guides through the centre: axes and diagonals.
-      lctx.globalAlpha = 0.4;
+      lctx.globalAlpha = 0.7;
       lctx.setLineDash([1, 4]);
       let dotted = 0;
       for (const ang of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
@@ -322,7 +299,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.setLineDash([]);
       lines.dataset.dotted = String(dotted);
       lctx.lineWidth = 0.8;
-      lctx.globalAlpha = 0.45;
+      lctx.globalAlpha = LINE_ALPHA;
       // Ticks at the four cardinal points.
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         lctx.beginPath();
