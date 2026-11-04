@@ -63,10 +63,17 @@ export function mountOrbitHalftone(opts: Opts) {
 
   // Phone band (canvas coordinates) the sphere must fit in; null = whole canvas.
   let band: { top: number; bottom: number } | null = null;
+  // Desktop: JUWON sits top-left; the centred sphere shrinks to stay clear of it.
+  let clearTop = 0;
   const resize = () => {
     w = dots.clientWidth;
     h = dots.clientHeight;
     band = null;
+    clearTop = 0;
+    if (opts.band && w >= 768) {
+      const c = dots.getBoundingClientRect();
+      clearTop = opts.band.below.getBoundingClientRect().bottom - c.top + 24;
+    }
     if (opts.band && w < 768) {
       const c = dots.getBoundingClientRect();
       const top = opts.band.above.getBoundingClientRect().bottom - c.top + 16;
@@ -89,7 +96,7 @@ export function mountOrbitHalftone(opts: Opts) {
       ? Math.min((band.bottom - band.top) / 2 / 1.12, w * 0.24) // small, as in the chosen mock (user)
       : mobile
         ? w * 0.44
-        : Math.min(w * 0.17, h * 0.28);
+        : Math.min(w * 0.17, h * 0.28, Math.max(80, (h * 0.5 - clearTop) / 1.12));
     const cx = w * 0.5;
     const cy = band ? (band.top + band.bottom) / 2 : h * 0.5;
     const yaw = pose.yaw + t * 0.08;

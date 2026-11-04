@@ -91,17 +91,16 @@ const site = loadSite();
     --fit-width: (100vw - 2 * var(--gutter)) * 0.86 / 0.98;
     text-align: center; /* phones: big and centred (user: A) */
   }
-  /* Desktop (user: B): a smaller JUWON sits bottom-left, just above the info line,
-     leaving the centre to the orbit graphic. */
+  /* Desktop: JUWON sits top-left at the same size and place as ARCHIVE and INFO,
+     so every page opens the same way; the orbit graphic keeps the centre. */
   @media (min-width: 768px) {
     .headline {
       position: absolute;
+      top: 96px;
       left: var(--gutter);
-      bottom: calc(var(--gutter) + 34px);
-      margin: 0;
+      margin: 0 0 0 -0.04em;
       text-align: left;
-      font-size: clamp(40px, 6.2vw, 96px);
-      line-height: 0.9;
+      font-size: clamp(48px, 12vw, 200px);
     }
     .subline {
       max-width: 34ch;
