@@ -57,7 +57,7 @@ test.describe('home graphics', () => {
         }
       return { inked: inked / total, dense: dense / total };
     });
-    expect(share.inked).toBeGreaterThan(0.1);
+    expect(share.inked).toBeGreaterThan(0.05); // smaller sphere covers less of the screen (user)
     expect(share.inked).toBeLessThan(0.75);
     // Variant ③: at rest the halftone is faint along the orbits (no dense areas required);
     // the pointer test below covers the reveal.
@@ -87,8 +87,11 @@ test.describe('home graphics', () => {
         r: Number(c.dataset.r),
         top: document.querySelector('.home .top')!.getBoundingClientRect().bottom,
         h1: document.querySelector('.home h1')!.getBoundingClientRect().top,
+        w: innerWidth,
       };
     });
+    expect(g.r).toBeLessThanOrEqual(g.w * 0.24 + 1); // small sphere, as in the user's mock
+    expect(Math.abs(g.cy - (g.top + g.h1) / 2)).toBeLessThan(20); // middle of the free band
     expect(g.cy - g.r).toBeGreaterThan(g.top);
     expect(g.cy + g.r).toBeLessThan(g.h1);
   });
@@ -243,7 +246,7 @@ test('graphic is centred on both axes on desktop, a little smaller (user: B)', a
   });
   expect(Math.abs(r.x - r.w / 2)).toBeLessThanOrEqual(1);
   expect(Math.abs(r.y - r.h / 2)).toBeLessThanOrEqual(1);
-  expect(r.r).toBeLessThanOrEqual(Math.min(r.w * 0.21, r.h * 0.34) + 1);
+  expect(r.r).toBeLessThanOrEqual(Math.min(r.w * 0.17, r.h * 0.28) + 1);
 });
 
 const juwonBox = (page: import('@playwright/test').Page) =>

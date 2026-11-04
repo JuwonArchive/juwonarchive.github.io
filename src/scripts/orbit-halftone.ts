@@ -86,10 +86,10 @@ export function mountOrbitHalftone(opts: Opts) {
     // Phones (A): the sphere fills the band above JUWON. Desktop (B): centred, a little smaller.
     // 1.12 leaves room for perspective swell and the outer orbits.
     const R = band
-      ? Math.min((band.bottom - band.top) / 2 / 1.12, w * 0.44)
+      ? Math.min((band.bottom - band.top) / 2 / 1.12, w * 0.24) // small, as in the chosen mock (user)
       : mobile
         ? w * 0.44
-        : Math.min(w * 0.21, h * 0.34);
+        : Math.min(w * 0.17, h * 0.28);
     const cx = w * 0.5;
     const cy = band ? (band.top + band.bottom) / 2 : h * 0.5;
     const yaw = pose.yaw + t * 0.08;
