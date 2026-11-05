@@ -27,9 +27,12 @@ type V3 = [number, number, number];
 const TAU = Math.PI * 2;
 const LINE_ALPHA = 0.85; // orbit lines and labels read clearly (user)
 const DESK_PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
-const PHONE_PITCH = 5;
+const PHONE_PITCH = 4; // phones: tighter again (user)
 // Pointer reveal: a tight spot whose dots are biggest at the pointer and shrink with distance (user).
-const REVEAL_SIGMA = 60;
+const REVEAL_SIGMA = 38; // smaller spot (user)
+// Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
+const BAND = 4.5;
+const PHONE_BAND = 3;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -202,15 +205,18 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.mode = mode;
     const subtle = mode === 'subtle';
     if (!subtle) along(silhouette, () => 0.4, 7);
+    // A narrower band keeps the same peak ink: the line's ink scales with σ, so compensate.
+    const band = w < 768 ? PHONE_BAND : BAND;
+    const bandGain = 7.5 / band;
     // Orbits: darker in front, fainter behind, with a slow pulse travelling along each line.
     g.orbits.forEach((o, oi) =>
       along(
         o,
         (i, z) => {
           const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, z));
-          return (0.2 + 0.8 * front * (0.5 + 0.5 * Math.sin(i * 0.12 - t * 1.4 + oi * 2))) * 0.45;
+          return (0.2 + 0.8 * front * (0.5 + 0.5 * Math.sin(i * 0.12 - t * 1.4 + oi * 2))) * 0.45 * bandGain;
         },
-        7.5,
+        band,
       ),
     );
     if (!subtle) {
@@ -227,7 +233,8 @@ export function mountOrbitHalftone(opts: Opts) {
     // Smallest dot 1px (no micro-dots), largest 3.4px.
     const MIN_R = w < 768 ? 0.6 : 1;
     // Diameter stays below the 7px spacing so dots never touch; smaller on phones.
-    const max = w < 768 ? 1.5 : 3.0;
+    // Diameter stays below the spacing so dots never touch.
+    const max = w < 768 ? 1.3 : 3.0;
     const buckets = new Map<number, number[]>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
@@ -238,12 +245,17 @@ export function mountOrbitHalftone(opts: Opts) {
           const px = xx * PITCH + PITCH / 2 - ptr.x;
           const py = yy * PITCH + PITCH / 2 - ptr.y;
           const reveal = ptr.on * Math.exp(-(px * px + py * py) / (2 * REVEAL_SIGMA * REVEAL_SIGMA));
-          // Size follows distance: full dots at the pointer, fading to the faint orbit dots further out.
-          a = Math.min(1, Math.max(a * 0.75, reveal * 1.05));
+          // Size follows distance: full dots at the pointer, shrinking outward. Screen-blended with
+          // the orbit dots so the spot and the orbits meet without a crease.
+          const base = a * 0.75;
+          a = Math.min(1, base + reveal * 1.05 * (1 - base));
         }
-        if (a < 0.12) continue;
-        const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow((a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
-        const aq = Math.round((0.45 + 0.55 * a) * 6); // 6 alpha steps
+        if (a < 0.06) continue;
+        const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow(Math.max(0, a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
+        // Outermost dots fade in instead of popping on at a hard threshold (no visible ring).
+        const fade = Math.min(1, (a - 0.06) / 0.2);
+        const aq = Math.round((0.45 + 0.55 * a) * fade * fade * (3 - 2 * fade) * 12); // 12 alpha steps
+        if (!aq) continue;
         const key = rq * 16 + aq;
         let list = buckets.get(key);
         if (!list) buckets.set(key, (list = []));
@@ -252,7 +264,7 @@ export function mountOrbitHalftone(opts: Opts) {
     const sizes = new Set<number>();
     for (const [key, list] of buckets) {
       sizes.add(key >> 4);
-      dctx.globalAlpha = (key & 15) / 6;
+      dctx.globalAlpha = (key & 15) / 12;
       const r = (key >> 4) / 4;
       const path = new Path2D();
       for (let i = 0; i < list.length; i += 2) {
@@ -266,6 +278,8 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);
+    dots.dataset.band = String(band);
+    dots.dataset.reveal = String(REVEAL_SIGMA);
     dots.dataset.readback = 'none';
     dots.dataset.cx = String(Math.round(g.cx));
 

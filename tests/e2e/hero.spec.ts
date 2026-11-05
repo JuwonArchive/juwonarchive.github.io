@@ -317,20 +317,24 @@ test('halftone is the subtle variant: faint at rest, revealed by the pointer (us
   await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-mode', 'subtle');
 });
 
-test('hover halftone is a tight spot: biggest dots at the pointer, smaller further out (user)', async ({ page, isMobile }) => {
+test('hover halftone is a tight spot that fades out smoothly; narrow band along the orbits (user)', async ({ page, isMobile }) => {
   test.skip(isMobile, 'pointer');
   await page.goto('/');
+  const dots = page.locator('canvas[data-halftone]');
+  expect(Number(await dots.getAttribute('data-reveal'))).toBeLessThanOrEqual(40);
+  expect(Number(await dots.getAttribute('data-band'))).toBeLessThanOrEqual(5);
   const vp = page.viewportSize()!;
   // Empty area right of the sphere, so only the reveal draws dots.
   const x = vp.width * 0.86;
   const y = vp.height * 0.3;
   await page.mouse.move(x, y, { steps: 4 });
-  await expect.poll(() => inkAround(page, x, y, 12), { timeout: 15_000 }).toBeGreaterThan(20);
-  await page.waitForTimeout(600);
-  const near = await inkAround(page, x, y, 12);
-  const mid = await inkAround(page, x - 70, y, 12);
-  const far = await inkAround(page, x - 160, y, 12);
-  expect(near).toBeGreaterThan(mid * 1.3);
-  expect(mid).toBeGreaterThan(far);
-  expect(far).toBeLessThan(near * 0.15); // narrower than before
+  await expect.poll(() => inkAround(page, x, y, 8), { timeout: 15_000 }).toBeGreaterThan(20);
+  await page.waitForTimeout(800);
+  // Radial profile: biggest at the pointer, shrinking outward, gone by ~110px, with no sudden step (no hard ring).
+  const profile: number[] = [];
+  // 20px windows: smaller ones alias with the 7px dot grid.
+  for (let d = 0; d <= 130; d += 10) profile.push(await inkAround(page, x - d, y, 10));
+  for (let i = 1; i < profile.length; i++) expect(profile[i]).toBeLessThanOrEqual(profile[i - 1] * 1.15 + 1);
+  for (let i = 1; i < profile.length; i++) expect(profile[i - 1] - profile[i]).toBeLessThan(profile[0] * 0.45);
+  expect(profile[11]).toBeLessThan(profile[0] * 0.05);
 });
