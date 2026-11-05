@@ -99,7 +99,8 @@ test.describe('home graphics', () => {
         w: innerWidth,
       };
     });
-    expect(g.r).toBeLessThanOrEqual(g.w * 0.24 + 1); // small sphere, as in the user's mock
+    expect(g.r).toBeLessThanOrEqual(g.w * 0.3 + 1); // the user picked 25% bigger than the first mock
+    expect(g.r).toBeGreaterThan(g.w * 0.27);
     expect(Math.abs(g.cy - (g.top + g.h1) / 2)).toBeLessThan(20); // middle of the free band
     expect(g.cy - g.r).toBeGreaterThan(g.top);
     expect(g.cy + g.r).toBeLessThan(g.h1);
