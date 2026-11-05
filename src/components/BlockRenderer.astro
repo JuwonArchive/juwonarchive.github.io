@@ -240,7 +240,7 @@ const isFirstImage = () => {
   }
   .b-divider {
     width: 100%;
-    max-width: 1280px;
+    max-width: var(--media-max);
     border: 0;
     border-top: 1px solid var(--line);
     margin: 40px 0;
@@ -248,10 +248,10 @@ const isFirstImage = () => {
   .b-media,
   .b-embed {
     width: 100%;
-    max-width: 1280px;
+    max-width: var(--media-max);
     margin: 0;
   }
-  /* Every post is the same width (up to 1280px); height follows the work itself, never cropped. */
+  /* Every post is the same width (up to --media-max, 880px); height follows the work itself, never cropped. */
   .frame {
     position: relative;
     display: block;

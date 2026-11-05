@@ -14,6 +14,8 @@
   --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   --gutter: clamp(16px, 2.2vw, 32px);
+  /* Archive media width on desktop; phones use the full width (user: 1280px felt too big). */
+  --media-max: 880px;
   --radius-pill: 999px;
   --radius-card: 6px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);

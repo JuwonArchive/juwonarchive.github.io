@@ -182,3 +182,9 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - The orbit markers are the archive boxes: `01 3D DESIGN` … (muted number, ink title, the same caption as the box) and each one opens its box.
 - The sphere keeps its original ink line art (an acrylic glass / box-edge-colour variant was tried and reverted, user).
 - Desktop JUWON (bottom-left, above the info line) is `clamp(48px, 8vw, 132px)`.
+
+## Halftone and media size (2026-11-05)
+
+- Hover reveal is a tight spot (σ 60px): dots are biggest at the pointer and shrink with distance.
+- Phones use a finer halftone (5px grid, dots 0.6–1.5px) to match the smaller sphere.
+- Archive media share one width capped at 880px on desktop (`--media-max`); phones use the full width.

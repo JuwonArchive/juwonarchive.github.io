@@ -105,13 +105,13 @@ test.describe('home graphics', () => {
     expect(g.cy + g.r).toBeLessThan(g.h1);
   });
 
-  test('dot sizes vary continuously (not one size)', async ({ page }) => {
+  test('dot sizes vary continuously (not one size)', async ({ page, isMobile }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const sizes = Number(await page.locator('canvas[data-halftone]').getAttribute('data-size-steps'));
     // Phones span 1–2.4px (user asked for smaller dots), so fewer quarter-pixel steps exist.
     // At rest (variant ③) sizes still vary along the orbits, over a narrower range.
-    expect(sizes).toBeGreaterThanOrEqual(5);
+    expect(sizes).toBeGreaterThanOrEqual(isMobile ? 3 : 5); // phones span only 0.6–1.5px
   });
 
   test('dots swell around the pointer', async ({ page, isMobile }) => {
@@ -222,13 +222,14 @@ test('graphic is horizontally centred on desktop (user)', async ({ page, isMobil
   expect(Math.abs(cx - page.viewportSize()!.width / 2)).toBeLessThan(2);
 });
 
-test('no background micro-dots; smaller max dots; paler colour (user)', async ({ page }) => {
+test('no background micro-dots; smaller max dots; paler colour (user)', async ({ page, isMobile }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const c = page.locator('canvas[data-halftone]');
   expect(await c.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none');
   expect(Number(await c.getAttribute('data-max-r'))).toBeLessThanOrEqual(3.5);
-  expect(Number(await c.getAttribute('data-min-r'))).toBeGreaterThanOrEqual(1);
+  // Phones go finer (0.6px) to match their small sphere (user).
+  expect(Number(await c.getAttribute('data-min-r'))).toBeGreaterThanOrEqual(isMobile ? 0.5 : 1);
   const color = (await c.getAttribute('data-dot-color'))!;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   expect((r + g + b) / 3).toBeGreaterThan(228);
@@ -293,7 +294,10 @@ test('phones use smaller halftone dots (user)', async ({ page, isMobile }) => {
   test.skip(!isMobile);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  expect(Number(await page.locator('canvas[data-halftone]').getAttribute('data-max-r'))).toBeLessThanOrEqual(2.5);
+  const dots = page.locator('canvas[data-halftone]');
+  // The phone sphere is small, so its dots and spacing are finer than desktop's (user).
+  expect(Number(await dots.getAttribute('data-max-r'))).toBeLessThanOrEqual(1.6);
+  expect(Number(await dots.getAttribute('data-pitch'))).toBeLessThan(7);
 });
 
 test('tighter halftone spacing; darker orbit lines and labels (user)', async ({ page }) => {
@@ -311,4 +315,22 @@ test('tighter halftone spacing; darker orbit lines and labels (user)', async ({ 
 test('halftone is the subtle variant: faint at rest, revealed by the pointer (user choice ③)', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-mode', 'subtle');
+});
+
+test('hover halftone is a tight spot: biggest dots at the pointer, smaller further out (user)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'pointer');
+  await page.goto('/');
+  const vp = page.viewportSize()!;
+  // Empty area right of the sphere, so only the reveal draws dots.
+  const x = vp.width * 0.86;
+  const y = vp.height * 0.3;
+  await page.mouse.move(x, y, { steps: 4 });
+  await expect.poll(() => inkAround(page, x, y, 12), { timeout: 15_000 }).toBeGreaterThan(20);
+  await page.waitForTimeout(600);
+  const near = await inkAround(page, x, y, 12);
+  const mid = await inkAround(page, x - 70, y, 12);
+  const far = await inkAround(page, x - 160, y, 12);
+  expect(near).toBeGreaterThan(mid * 1.3);
+  expect(mid).toBeGreaterThan(far);
+  expect(far).toBeLessThan(near * 0.15); // narrower than before
 });

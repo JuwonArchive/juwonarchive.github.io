@@ -88,8 +88,8 @@ test.describe('work detail', () => {
   });
 });
 
-test.describe('media at a uniform 1280px width (user)', () => {
-  test('every image, video and embed is the same width, ≤1280px, at its own aspect (never cropped)', async ({ page }) => {
+test.describe('media at a uniform 880px width (user)', () => {
+  test('every image, video and embed is the same width, ≤880px, at its own aspect (never cropped)', async ({ page }) => {
     for (const w of site.works) {
       await page.goto(`/archive/${w.slug}`);
       const frames = page.locator('[data-frame]');
@@ -115,7 +115,7 @@ test.describe('media at a uniform 1280px width (user)', () => {
           return { w: box.width, h: box.height, aspect, fit: 'contain' };
         });
         widths.add(Math.round(r.w));
-        expect(r.w).toBeLessThanOrEqual(1280.5);
+        expect(r.w).toBeLessThanOrEqual(880.5);
         expect(r.fit).not.toBe('cover');
         expect(Math.abs(r.w / r.h - r.aspect) / r.aspect).toBeLessThan(0.03);
       }

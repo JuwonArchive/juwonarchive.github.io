@@ -26,7 +26,10 @@ type V3 = [number, number, number];
 
 const TAU = Math.PI * 2;
 const LINE_ALPHA = 0.85; // orbit lines and labels read clearly (user)
-const PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
+const DESK_PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
+const PHONE_PITCH = 5;
+// Pointer reveal: a tight spot whose dots are biggest at the pointer and shrink with distance (user).
+const REVEAL_SIGMA = 60;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -159,6 +162,8 @@ export function mountOrbitHalftone(opts: Opts) {
 
     // 1. Ink field on the halftone grid, computed on the CPU (no GPU readback):
     //    every line is sampled and splatted as a soft Gaussian into the cells around it.
+    // Phones show a much smaller sphere, so the screen is finer too (user).
+    const PITCH = w < 768 ? PHONE_PITCH : DESK_PITCH;
     const cols = Math.ceil(w / PITCH);
     const rows = Math.ceil(h / PITCH);
     if (field.length !== cols * rows) field = new Float32Array(cols * rows);
@@ -220,9 +225,9 @@ export function mountOrbitHalftone(opts: Opts) {
     dctx.clearRect(0, 0, w, h);
     dctx.fillStyle = opts.dotColor;
     // Smallest dot 1px (no micro-dots), largest 3.4px.
-    const MIN_R = 1;
+    const MIN_R = w < 768 ? 0.6 : 1;
     // Diameter stays below the 7px spacing so dots never touch; smaller on phones.
-    const max = w < 768 ? 2.2 : 3.0;
+    const max = w < 768 ? 1.5 : 3.0;
     const buckets = new Map<number, number[]>();
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
@@ -232,9 +237,9 @@ export function mountOrbitHalftone(opts: Opts) {
           // Faint along the orbits; the pointer reveals the halftone around it.
           const px = xx * PITCH + PITCH / 2 - ptr.x;
           const py = yy * PITCH + PITCH / 2 - ptr.y;
-          const reveal = ptr.on * Math.exp(-(px * px + py * py) / (2 * 110 * 110));
-          a = a * (0.75 + 1.2 * reveal) + 0.55 * reveal;
-          a = Math.min(1, a);
+          const reveal = ptr.on * Math.exp(-(px * px + py * py) / (2 * REVEAL_SIGMA * REVEAL_SIGMA));
+          // Size follows distance: full dots at the pointer, fading to the faint orbit dots further out.
+          a = Math.min(1, Math.max(a * 0.75, reveal * 1.05));
         }
         if (a < 0.12) continue;
         const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow((a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
