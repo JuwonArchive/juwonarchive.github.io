@@ -35,12 +35,18 @@ const RIPPLE_PERIOD = 1.6;
 const RIPPLE_REACH = 120; // px the ring travels
 const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
 // The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
-const IDLE_MS = 3000; // 3s of rest before the hover halftone fades (user)
+const IDLE_MS = 3000;
+// Overlap → ink. Two full-strength lines crossing give 1; the gain lets fainter crossings still show.
+const OVERLAP_GAIN = 2.2; // 3s of rest before the hover halftone fades (user)
 // Beyond this distance neither the spot (4σ) nor the ripple ring reaches.
 const REACH = Math.max(4 * REVEAL_SIGMA, 10 + RIPPLE_REACH + 3 * RIPPLE_WIDTH);
 // Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
 const BAND = 4.5;
 const PHONE_BAND = 3;
+// Halftone now appears only where elements overlap (user), so each element's ink reaches wider than the old
+// band: crossings then form visible lens shapes that peak in the middle and taper to both ends.
+const OVERLAP_BAND = 9;
+const PHONE_OVERLAP_BAND = 4.5;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -64,7 +70,9 @@ export function mountOrbitHalftone(opts: Opts) {
   const lctx = lines?.getContext('2d') ?? null;
   if (!dctx) return;
   dots.dataset.form = 'orbit';
-  let field = new Float32Array(0);
+  let field = new Float32Array(0); // Σ of every element's ink (clamped per element)
+  let fieldSq = new Float32Array(0); // Σ of squares: with Σ it gives the overlap between elements
+  let elem = new Float32Array(0); // the element being drawn
   const kx = new Float32Array(256);
   // Soft edges for free: the dot canvas renders at 0.75× and the browser's upscale blurs it ~0.5px.
   const BLUR = 0.5;
@@ -169,6 +177,13 @@ export function mountOrbitHalftone(opts: Opts) {
     { passive: true },
   );
 
+  // Where marker i sits on its orbit at time t (shared by the halftone and the line layer).
+  const markerPhase = (i: number, t: number) => ((i * 0.27 + t * 0.025 * (1 + (i % 3) * 0.3)) % 1 + 1) % 1;
+  const markerAt = (g: { orbits: { x: number; y: number }[][] }, i: number, t: number) => {
+    const orbit = g.orbits[i % g.orbits.length];
+    return orbit[Math.floor(markerPhase(i, t) * (orbit.length - 1))];
+  };
+
   const draw = (t: number) => {
     const g = geometry(t);
 
@@ -178,8 +193,33 @@ export function mountOrbitHalftone(opts: Opts) {
     const PITCH = w < 768 ? PHONE_PITCH : DESK_PITCH;
     const cols = Math.ceil(w / PITCH);
     const rows = Math.ceil(h / PITCH);
-    if (field.length !== cols * rows) field = new Float32Array(cols * rows);
-    else field.fill(0);
+    if (field.length !== cols * rows) {
+      field = new Float32Array(cols * rows);
+      fieldSq = new Float32Array(cols * rows);
+      elem = new Float32Array(cols * rows);
+    } else {
+      field.fill(0);
+      fieldSq.fill(0);
+    }
+    // Each element (orbit, centre ellipse, marker) is splatted on its own, then folded into Σ and Σ².
+    // Halftone appears only where elements overlap (user): Σ_{i<j} e_i·e_j = (Σ² − Σsq) / 2.
+    let lo = Infinity;
+    let hi = -1;
+    const beginElement = () => {
+      lo = Infinity;
+      hi = -1;
+    };
+    const endElement = () => {
+      if (hi < 0) return;
+      for (let k = lo; k <= hi; k++) {
+        const v = elem[k];
+        if (!v) continue;
+        const c = v > 1 ? 1 : v;
+        field[k] += c;
+        fieldSq[k] += c * c;
+        elem[k] = 0;
+      }
+    };
     const splat = (x: number, y: number, amount: number, radius: number) => {
       const cxi = x / PITCH - 0.5;
       const cyi = y / PITCH - 0.5;
@@ -195,8 +235,10 @@ export function mountOrbitHalftone(opts: Opts) {
       for (let yy = y0; yy <= y1; yy++) {
         const gy = amount * Math.exp(-((yy - cyi) ** 2) * inv);
         const row = yy * cols;
-        for (let xx = x0; xx <= x1; xx++) field[row + xx] += gy * gx[xx - x0];
+        for (let xx = x0; xx <= x1; xx++) elem[row + xx] += gy * gx[xx - x0];
       }
+      lo = Math.min(lo, y0 * cols + x0);
+      hi = Math.max(hi, y1 * cols + x1);
     };
     const along = (pts: { x: number; y: number }[], amount: (i: number, z: number) => number, radius: number) => {
       for (let i = 1; i < pts.length; i++) {
@@ -213,27 +255,52 @@ export function mountOrbitHalftone(opts: Opts) {
     const mode = opts.mode ?? 'subtle';
     dots.dataset.mode = mode;
     const subtle = mode === 'subtle';
-    if (!subtle) along(silhouette, () => 0.4, 7);
+    if (!subtle) {
+      beginElement();
+      along(silhouette, () => 0.4, 7);
+      endElement();
+    }
     // A narrower band keeps the same peak ink: the line's ink scales with σ, so compensate.
-    const band = w < 768 ? PHONE_BAND : BAND;
+    const band = w < 768 ? PHONE_OVERLAP_BAND : OVERLAP_BAND;
     const bandGain = 7.5 / band;
     // Orbits: darker in front, fainter behind, with a slow pulse travelling along each line.
-    g.orbits.forEach((o, oi) =>
+    g.orbits.forEach((o, oi) => {
+      beginElement();
       along(
         o,
         (i, z) => {
           const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, z));
-          return (0.2 + 0.8 * front * (0.5 + 0.5 * Math.sin(i * 0.12 - t * 1.4 + oi * 2))) * 0.45 * bandGain;
+          return (0.35 + 0.65 * front * (0.5 + 0.5 * Math.sin(i * 0.12 - t * 1.4 + oi * 2))) * 0.6 * bandGain;
         },
         band,
-      ),
-    );
+      );
+      endElement();
+    });
+    // Centre ellipses and the markers are elements too: where an orbit crosses them, dots appear.
+    for (const o of g.centre) {
+      beginElement();
+      along(o, () => 0.5 * bandGain, band);
+      endElement();
+    }
+    opts.labels.forEach((_, i) => {
+      const p = markerAt(g, i, t);
+      beginElement();
+      splat(p.x, p.y, 1.1, band * 2.2);
+      endElement();
+    });
     if (!subtle) {
-      for (const o of g.centre) along(o, () => 0.3, 6);
-      for (const o of g.dashed) along(o, () => 0.12, 6);
+      for (const o of g.dashed) {
+        beginElement();
+        along(o, () => 0.12, 6);
+        endElement();
+      }
     }
     // Pointer: a soft swell under the cursor.
-    if (ptr.on > 0.01 && mode === 'full') splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
+    if (ptr.on > 0.01 && mode === 'full') {
+      beginElement();
+      splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
+      endElement();
+    }
 
     // 2. Halftone screen, batched: dots of similar size/alpha share one path.
     dctx.setTransform(DOT_SCALE, 0, 0, DOT_SCALE, 0, 0);
@@ -251,7 +318,10 @@ export function mountOrbitHalftone(opts: Opts) {
     const ringAmp = 0.95 * (1 - phase) ** 1.2 * Math.min(1, phase * 8);
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
-        let a = Math.min(1, field[yy * cols + xx]);
+        const k = yy * cols + xx;
+        // Overlap between elements; the product makes each crossing peak in the middle and taper to both ends.
+        const sum = field[k];
+        let a = sum ? Math.min(1, OVERLAP_GAIN * ((sum * sum - fieldSq[k]) / 2)) : 0;
         if (mode === 'none') continue;
         if (subtle) {
           const base = a * 0.75;
@@ -299,10 +369,12 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);
+    dots.dataset.ink = 'overlap';
     dots.dataset.ripple = String(RIPPLE_PERIOD);
     dots.dataset.idle = String(IDLE_MS);
     dots.dataset.hover = ptr.on.toFixed(2);
-    dots.dataset.band = String(band);
+    dots.dataset.band = String(w < 768 ? PHONE_BAND : BAND);
+    dots.dataset.overlapBand = String(band);
     dots.dataset.reveal = String(REVEAL_SIGMA);
     dots.dataset.readback = 'none';
     dots.dataset.cx = String(Math.round(g.cx));
@@ -369,7 +441,7 @@ export function mountOrbitHalftone(opts: Opts) {
       opts.labels.forEach((label, i) => {
         const orbit = g.orbits[i % g.orbits.length];
         const n = orbit.length - 1;
-        const f = ((i * 0.27 + t * 0.025 * (1 + (i % 3) * 0.3)) % 1 + 1) % 1;
+        const f = markerPhase(i, t);
         const p = orbit[Math.floor(f * n)];
         const q = orbit[(Math.floor(f * n) + 2) % n];
         lctx.beginPath();
@@ -458,7 +530,8 @@ export function mountOrbitHalftone(opts: Opts) {
   const start = performance.now();
   const loop = (now: number) => {
     requestAnimationFrame(loop);
-    if (!visible || document.hidden || now - last < 33) return;
+    // ~30 fps on desktop, ~24 fps on phones: the motion is slow, and phones have less to spare.
+    if (!visible || document.hidden || now - last < (w < 768 ? 41 : 33)) return;
     last = now;
     pose.yaw += (pose.ty - pose.yaw) * 0.08;
     pose.pitch += (pose.tp - pose.pitch) * 0.08;

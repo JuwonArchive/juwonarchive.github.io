@@ -137,7 +137,9 @@ test.describe('home graphics', () => {
     expect(Number(await lines.getAttribute('data-dotted'))).toBeGreaterThanOrEqual(4);
     const color = (await page.locator('canvas[data-halftone]').getAttribute('data-dot-color'))!;
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-    expect((r + g + b) / 3).toBeGreaterThan(215); // paler again (user)
+    // A little darker than before (user), still a light screen behind the black lines.
+    expect((r + g + b) / 3).toBeGreaterThan(195);
+    expect((r + g + b) / 3).toBeLessThan(225);
   });
 
   test('the orbits turn toward the pointer', async ({ page, isMobile }) => {
@@ -233,7 +235,7 @@ test('no background micro-dots; smaller max dots; paler colour (user)', async ({
   expect(Number(await c.getAttribute('data-min-r'))).toBeGreaterThanOrEqual(isMobile ? 0.5 : 1);
   const color = (await c.getAttribute('data-dot-color'))!;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-  expect((r + g + b) / 3).toBeGreaterThan(228);
+  expect((r + g + b) / 3).toBeLessThan(225); // a little darker (user)
 });
 
 test('halftone has a very slight blur (user)', async ({ page }) => {
@@ -404,4 +406,19 @@ test.describe('hover halftone (user)', () => {
     await page.mouse.move(x - 4, y + 2, { steps: 2 });
     await expect.poll(() => inkAround(page, x - 4, y + 2, 8), { timeout: 5000 }).toBeGreaterThan(20);
   });
+});
+
+test('halftone appears only where elements overlap, tapering at both ends (user)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const dots = page.locator('canvas[data-halftone]');
+  await expect(dots).toHaveAttribute('data-ink', 'overlap');
+  // Away from every crossing (a plain stretch of the right-hand orbit edge is still crowded, so use the
+  // empty quarter left of centre inside the sphere) there is no ink at rest.
+  const r = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+    const b = c.getBoundingClientRect();
+    return { x: b.left + Number(c.dataset.cx), y: b.top + Number(c.dataset.cy), r: Number(c.dataset.r) };
+  });
+  expect(await inkAround(page, r.x - r.r * 0.35, r.y - r.r * 0.55, 6)).toBeLessThan(2);
 });
