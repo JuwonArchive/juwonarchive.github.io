@@ -6,6 +6,8 @@ export type Media = {
   width?: number;
   height?: number;
   bytes?: number;
+  /** Video: a lighter copy for phones (≤720px wide). */
+  mobileSrc?: string;
   /** A tall image cut into pieces (top to bottom); `src` is the first piece. */
   tiles?: { src: string; height: number }[];
 };

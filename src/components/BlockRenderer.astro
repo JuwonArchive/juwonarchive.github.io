@@ -132,17 +132,34 @@ const isFirstImage = () => {
             <figure class="b-media">
               <CropMarks>
                 <div class="frame" data-frame>
-                  <video
-                    src={b.media.src}
-                    width={b.media.width}
-                    height={b.media.height}
-                    muted
-                    playsinline
-                    loop
-                    controls
-                    preload="metadata"
-                    data-inview-play
-                  />
+                  {b.media.mobileSrc ? (
+                    // Phones pick the lighter copy; the first matching <source> wins.
+                    <video
+                      width={b.media.width}
+                      height={b.media.height}
+                      muted
+                      playsinline
+                      loop
+                      controls
+                      preload="metadata"
+                      data-inview-play
+                    >
+                      <source src={b.media.mobileSrc} type="video/mp4" media="(max-width: 767px)" />
+                      <source src={b.media.src} type="video/mp4" />
+                    </video>
+                  ) : (
+                    <video
+                      src={b.media.src}
+                      width={b.media.width}
+                      height={b.media.height}
+                      muted
+                      playsinline
+                      loop
+                      controls
+                      preload="metadata"
+                      data-inview-play
+                    />
+                  )}
                   {b.source && <IgLink href={b.source} />}
                 </div>
               </CropMarks>

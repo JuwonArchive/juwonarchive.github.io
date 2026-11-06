@@ -162,6 +162,18 @@ test.describe('media at a uniform 880px width (user)', () => {
     for (const g of gaps) expect(g).toBeLessThanOrEqual(0.01);
   });
 
+  test('phones play the lighter copy of a video, desktops the full one (user)', async ({ page, isMobile }) => {
+    const w = site.works.find((x) => x.blocks.some((b) => b.type === 'video' && !!(b as { media?: { mobileSrc?: string } }).media?.mobileSrc));
+    test.skip(!w, 'no phone copies in the current content');
+    await page.goto(`/archive/${w!.slug}`);
+    const v = page.locator('video:has(source[media])').first();
+    await v.scrollIntoViewIfNeeded();
+    await expect.poll(() => v.evaluate((el: HTMLVideoElement) => el.currentSrc), { timeout: 10_000 }).not.toBe('');
+    const src = await v.evaluate((el: HTMLVideoElement) => el.currentSrc);
+    if (isMobile) expect(src).toMatch(/-m\.mp4$/);
+    else expect(src).not.toMatch(/-m\.mp4$/);
+  });
+
   test('Instagram posts carry a button to the original post', async ({ page }) => {
     const w = site.works.find((x) => x.blocks.some((b) => ('source' in b && b.source) || (b.type === 'embed' && 'provider' in b && b.provider === 'instagram')));
     test.skip(!w, 'no Instagram posts');
