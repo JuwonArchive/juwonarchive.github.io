@@ -20,18 +20,27 @@ const markers = loadSite().works.map((w, i) => ({
   <div><dt>LAST WAVE</dt><dd data-ro="last">—</dd></div>
   <div class="gap"><dt>VIEW</dt><dd data-ro="view">—</dd></div>
 </dl>
-<!-- Phones (user): the same readout, compact, under the sphere. -->
+<!-- Phones (user): the readout split across the top, under the top bar: counts left, view right. -->
 <p class="readout-m mono" data-readout-m aria-hidden="true" hidden>
   <span data-rm="counts">—</span>
   <span data-rm="view">—</span>
-  <span data-rm="orbits">—</span>
 </p>
 
 <script>
   import { mountOrbitHalftone } from '../scripts/orbit-halftone';
   const dots = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
   const lines = document.querySelector<HTMLCanvasElement>('canvas[data-trace]');
-  const above = document.querySelector<HTMLElement>('.home .top');
+  const topBar = document.querySelector<HTMLElement>('.home .top');
+  // Phones: the readout sits a clear gap under the top bar, and the sphere's band starts under the readout.
+  const rmEl = document.querySelector<HTMLElement>('[data-readout-m]');
+  const phoneRo = !!rmEl && matchMedia('(max-width: 767px)').matches;
+  if (rmEl && topBar && phoneRo) {
+    rmEl.hidden = false; // shown first: a hidden element has no offsetParent to measure against
+    const host = rmEl.offsetParent as HTMLElement | null;
+    const hostTop = host ? host.getBoundingClientRect().top : 0;
+    rmEl.style.top = `${topBar.getBoundingClientRect().bottom - hostTop + 16}px`;
+  }
+  const above = phoneRo ? rmEl : topBar;
   const below = document.querySelector<HTMLElement>('.home h1');
   const markers: { label: string; href: string }[] = JSON.parse(lines?.dataset.markers ?? '[]');
   if (dots) {
@@ -55,7 +64,6 @@ const markers = loadSite().works.map((w, i) => ({
   const ro = document.querySelector<HTMLElement>('[data-readout]');
   const rm = document.querySelector<HTMLElement>('[data-readout-m]');
   const src = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
-  const headline = document.querySelector<HTMLElement>('.home h1');
   if (rm && src && matchMedia('(max-width: 767px)').matches) {
     const set = (k: string, v: string) => {
       const el = rm.querySelector<HTMLElement>(`[data-rm="${k}"]`);
@@ -64,17 +72,10 @@ const markers = loadSite().works.map((w, i) => ({
     const f = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toFixed(2);
     const update = () => {
       const d = src.dataset;
-      set('counts', `CROSSINGS ${String(d.crossings ?? 0).padStart(2, '0')} · WAVES ${String(d.bursts ?? 0).padStart(2, '0')} · LAST ${d.lastStrength ? Number(d.lastStrength).toFixed(2) : '—'}`);
+      set('counts', `CROSSINGS ${String(d.crossings ?? 0).padStart(2, '0')} · WAVES ${String(d.bursts ?? 0).padStart(2, '0')}`);
       const [yaw] = (d.pose ?? '0,0').split(',').map(Number);
-      set('view', `VIEW YAW ${f(yaw)} PITCH ${f(Number(d.tilt ?? 0))}`);
-      set('orbits', (d.orbitDrift ?? '').split(' ').map((o, i) => `O${i + 1} ${f(Number(o.split('/')[0]))}`).join(' · '));
-      // Under the sphere, centred on it; hidden when the phone is too short to fit it above JUWON.
-      const top = Number(d.cy) + Number(d.r) + 44;
-      rm.style.top = `${top}px`;
-      const limit = headline ? headline.getBoundingClientRect().top - src.getBoundingClientRect().top - 10 : Infinity;
-      rm.hidden = !(Number.isFinite(top) && top + rm.offsetHeight <= limit);
+      set('view', `YAW ${f(yaw)} · PITCH ${f(Number(d.tilt ?? 0))}`);
     };
-    rm.hidden = false;
     update();
     setInterval(update, 200);
   }
@@ -154,17 +155,15 @@ const markers = loadSite().works.map((w, i) => ({
   .readout-m {
     position: absolute;
     z-index: 2;
-    left: 0;
-    right: 0;
+    left: var(--gutter);
+    right: var(--gutter);
     margin: 0;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
+    justify-content: space-between;
+    gap: 12px;
     color: var(--muted);
     font-size: 8.5px;
     line-height: 1.5;
-    text-align: center;
     pointer-events: none;
     font-variant-numeric: tabular-nums;
     white-space: pre;

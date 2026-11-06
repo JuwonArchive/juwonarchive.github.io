@@ -226,20 +226,21 @@ test.describe('home graphics', () => {
     await page.waitForTimeout(1500);
     const readout = page.locator('[data-readout]');
     if (isMobile) {
-      // Phones (user): the same idea, fitted — axes extended and a compact readout under the sphere, above JUWON.
+      // Phones (user): no axes; the readout splits across the top, a clear gap under the top bar, above the sphere.
       await expect(readout).toBeHidden();
-      await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-axes', 'extended');
+      await expect(page.locator('canvas[data-trace]')).not.toHaveAttribute('data-axes', 'extended');
       const rm = page.locator('[data-readout-m]');
       await expect(rm).toBeVisible();
       await expect(rm).toContainText(/CROSSINGS \d\d · WAVES \d\d/);
+      await expect(rm).toContainText(/YAW .* · PITCH/);
       const r = (await rm.boundingBox())!;
-      const h1 = (await page.locator('.home h1').boundingBox())!;
-      const sphereBottom = await page.evaluate(() => {
+      const bar = (await page.locator('.home .top').boundingBox())!;
+      const sphereTop = await page.evaluate(() => {
         const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
-        return c.getBoundingClientRect().top + Number(c.dataset.cy) + Number(c.dataset.r);
+        return c.getBoundingClientRect().top + Number(c.dataset.cy) - Number(c.dataset.r);
       });
-      expect(r.y).toBeGreaterThan(sphereBottom);
-      expect(r.y + r.height).toBeLessThan(h1.y);
+      expect(r.y - (bar.y + bar.height)).toBeGreaterThanOrEqual(12);
+      expect(r.y + r.height).toBeLessThan(sphereTop - 12);
       return;
     }
     await expect(page.locator('[data-readout-m]')).toBeHidden();

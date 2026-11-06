@@ -603,8 +603,9 @@ export function mountOrbitHalftone(opts: Opts) {
       // The axes run on towards the screen edges like a technical drawing — dotted, with ticks and a small label
       // at each end — so the white reads as layout (user). Phones: finer ticks, the vertical axis runs up to the
       // top bar and down only as far as the readout under the sphere.
-      {
-        const phoneAxes = w < 768;
+      // Desktop only: on phones the axes made the small screen busy (user).
+      if (w >= 768) {
+        const phoneAxes = false;
         const m = phoneAxes ? 16 : 32; // stay clear of the corner text
         const x0 = m, x1 = w - m;
         const y0 = phoneAxes && band ? band.top : 72;
