@@ -465,3 +465,21 @@ test('stroke dots fade: lighter as well as smaller away from the middle (user)',
   // The largest quarter of dots is clearly more opaque than the smallest quarter.
   expect(avg(sorted.slice(-q))).toBeGreaterThan(avg(sorted.slice(0, q)) * 1.4);
 });
+
+test('new crossings send out a ripple, at most a few at once (user)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'pointer turns the sphere');
+  await page.goto('/');
+  await page.waitForTimeout(3000);
+  const dots = page.locator('canvas[data-halftone]');
+  // Swing the pointer across: the sphere turns and crossings appear.
+  await page.mouse.move(40, 450);
+  await page.waitForTimeout(1200);
+  await page.mouse.move(1400, 450, { steps: 20 });
+  let most = 0;
+  for (let i = 0; i < 60; i++) {
+    most = Math.max(most, Number(await dots.getAttribute('data-cross-ripples')));
+    await page.waitForTimeout(50);
+  }
+  expect(most).toBeGreaterThan(0);
+  expect(most).toBeLessThanOrEqual(3);
+});

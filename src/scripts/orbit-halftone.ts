@@ -48,6 +48,13 @@ const STROKE_WIDTH = 7; // σ at the crossing, px
 const STROKE_WIDTH_PHONE = 4;
 const STROKE_INK = 1.15;
 const MIN_CROSS_ANGLE = (28 * Math.PI) / 180;
+// A new crossing grows its stroke over this long and sends out one ripple ring (user).
+const STROKE_GROW_S = 0.6;
+const CROSS_RIPPLE_S = 1.4;
+const CROSS_RIPPLE_REACH = 110;
+const CROSS_RIPPLE_REACH_PHONE = 50;
+const RIPPLE_GAP_S = 1.6;
+const MAX_CROSS_RIPPLES = 3;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -128,6 +135,45 @@ export function strokeSamples(pts: Pt[], i: number, t: number, half: number, ste
   return out;
 }
 
+export type TrackedCrossing = { key: string; x: number; y: number; born: number; seen: number; ring?: boolean };
+
+/**
+ * Follows crossings from frame to frame. Per pair of lines, crossings are matched to the nearest remembered ones
+ * (however far they moved: the sphere can turn fast) and keep their birth time; only when a pair has more
+ * crossings than before are the extra ones new (born now). Crossings that vanish are remembered for `keep`
+ * seconds, so one that flickers at a segment joint or the angle limit is not reborn. New crossings grow their
+ * stroke and ripple (user).
+ */
+export function trackCrossings(
+  memory: TrackedCrossing[],
+  now: { key: string; x: number; y: number }[],
+  time: number,
+  keep = 0.4,
+): { now: TrackedCrossing[]; memory: TrackedCrossing[] } {
+  const cur: TrackedCrossing[] = now.map((c) => ({ ...c, born: time, seen: time }));
+  const used = new Set<number>();
+  for (const key of new Set(now.map((c) => c.key))) {
+    const pairs: [number, number, number][] = [];
+    cur.forEach((c, i) => {
+      if (c.key !== key) return;
+      memory.forEach((m, j) => {
+        if (m.key === key) pairs.push([Math.hypot(m.x - c.x, m.y - c.y), i, j]);
+      });
+    });
+    pairs.sort((a, b) => a[0] - b[0]);
+    const usedNow = new Set<number>();
+    for (const [, i, j] of pairs) {
+      if (usedNow.has(i) || used.has(j)) continue;
+      usedNow.add(i);
+      used.add(j);
+      cur[i].born = memory[j].born;
+      cur[i].ring = memory[j].ring;
+    }
+  }
+  const ghosts = memory.filter((m, j) => !used.has(j) && time - m.seen < keep);
+  return { now: cur, memory: [...cur, ...ghosts] };
+}
+
 export function mountOrbitHalftone(opts: Opts) {
   const { dots, lines } = opts;
   const dctx = dots.getContext('2d');
@@ -135,6 +181,8 @@ export function mountOrbitHalftone(opts: Opts) {
   if (!dctx) return;
   dots.dataset.form = 'orbit';
   let field = new Float32Array(0); // halftone ink per cell
+  let memory: TrackedCrossing[] = []; // crossings seen recently, with birth times
+  const lastRipple = new Map<string, number>(); // per pair of lines
   const kx = new Float32Array(256);
   // Soft edges for free: the dot canvas renders at 0.75× and the browser's upscale blurs it ~0.5px.
   const BLUR = 0.5;
@@ -285,22 +333,59 @@ export function mountOrbitHalftone(opts: Opts) {
     const half = phone ? STROKE_HALF_PHONE : STROKE_HALF;
     const widest = phone ? STROKE_WIDTH_PHONE : STROKE_WIDTH;
     const step = PITCH * 0.7;
-    let strokes = 0;
     const others = [...g.orbits, ...g.centre];
+    const found: { key: string; x: number; y: number; orbit: Pt[]; i: number; t: number }[] = [];
     g.orbits.forEach((orbit, oi) => {
       for (let oj = 0; oj < others.length; oj++) {
         if (oj <= oi) continue; // each orbit pair once; every orbit against both ellipses
         for (const c of crossings(orbit, others[oj], MIN_CROSS_ANGLE)) {
-          strokes++;
-          for (const p of strokeSamples(orbit, c.i, c.t, half, step)) {
-            const radius = widest * (0.18 + 0.82 * p.w);
-            // Peak ink ≈ p.w for a line of splats `step` apart with σ = radius.
-            splat(p.x, p.y, (p.w * step) / (radius * Math.sqrt(2 * Math.PI)) * STROKE_INK, radius);
-          }
+          const a = orbit[c.i - 1];
+          const b = orbit[c.i];
+          found.push({ key: `${oi}-${oj}`, x: a.x + (b.x - a.x) * c.t, y: a.y + (b.y - a.y) * c.t, orbit, i: c.i, t: c.t });
         }
       }
     });
-    dots.dataset.strokes = String(strokes);
+    // New crossings (user): the stroke grows out from the crossing and a ripple spreads from it.
+    const track = trackCrossings(memory, found, t);
+    memory = track.memory;
+    // Calm when the sphere swings fast: a pair of lines ripples at most once per RIPPLE_GAP_S, and at most
+    // MAX_CROSS_RIPPLES rings run at once.
+    let ripples = 0;
+    found.forEach((c, n) => {
+      const age = opts.reducedMotion ? Infinity : t - track.now[n].born;
+      if (age === 0) {
+        // Every new crossing grows its stroke; only some send a ring.
+        const last = lastRipple.get(c.key) ?? -Infinity;
+        if (t - last >= RIPPLE_GAP_S) {
+          lastRipple.set(c.key, t);
+          track.now[n].ring = true;
+        }
+      }
+      const g01 = Math.min(1, age / STROKE_GROW_S);
+      const grow = 1 - (1 - g01) ** 3; // ease out
+      if (grow > 0.02) {
+        for (const p of strokeSamples(c.orbit, c.i, c.t, half * grow, step)) {
+          const radius = widest * (0.18 + 0.82 * p.w) * (0.5 + 0.5 * grow);
+          // Peak ink ≈ p.w for a line of splats `step` apart with σ = radius.
+          splat(p.x, p.y, ((p.w * step) / (radius * Math.sqrt(2 * Math.PI))) * STROKE_INK * grow, radius);
+        }
+      }
+      if (age < CROSS_RIPPLE_S && track.now[n].ring && ripples < MAX_CROSS_RIPPLES) {
+        ripples++;
+        const k = age / CROSS_RIPPLE_S;
+        const r = 6 + k * (phone ? CROSS_RIPPLE_REACH_PHONE : CROSS_RIPPLE_REACH);
+        const sigma = phone ? 3 : 5;
+        const amp = 0.85 * (1 - k) ** 1.4;
+        const count = Math.max(12, Math.ceil((2 * Math.PI * r) / step));
+        const amount = ((amp * ((2 * Math.PI * r) / count)) / (sigma * Math.sqrt(2 * Math.PI)));
+        for (let j = 0; j < count; j++) {
+          const th = (j / count) * TAU;
+          splat(c.x + Math.cos(th) * r, c.y + Math.sin(th) * r, amount, sigma);
+        }
+      }
+    });
+    dots.dataset.strokes = String(found.length);
+    dots.dataset.crossRipples = String(ripples);
     // Pointer: a soft swell under the cursor ('full' mode only).
     if (ptr.on > 0.01 && mode === 'full') splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
