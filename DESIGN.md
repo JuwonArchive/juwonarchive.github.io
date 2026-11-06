@@ -189,3 +189,5 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - The halftone band along the orbits is narrow (σ 4.5px desktop, 3px phones).
 - Phones use a finer halftone (4px grid, dots 0.6–1.3px) to match the smaller sphere.
 - Archive media share one width capped at 880px on desktop (`--media-max`); phones use the full width.
+- Hover ripple: every 1.6s a ring of larger dots leaves the pointer and fades as it spreads (~120px). The spot itself is slightly lighter than the ring so each ripple reads.
+- Idle: after the pointer rests 1.8s the hover halftone fades out (~1s); the next move brings it back.

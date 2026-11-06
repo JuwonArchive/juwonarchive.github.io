@@ -318,24 +318,90 @@ test('halftone is the subtle variant: faint at rest, revealed by the pointer (us
   await expect(page.locator('canvas[data-halftone]')).toHaveAttribute('data-mode', 'subtle');
 });
 
-test('hover halftone is a tight spot that fades out smoothly; narrow band along the orbits (user)', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'pointer');
-  await page.goto('/');
-  const dots = page.locator('canvas[data-halftone]');
-  expect(Number(await dots.getAttribute('data-reveal'))).toBeLessThanOrEqual(40);
-  expect(Number(await dots.getAttribute('data-band'))).toBeLessThanOrEqual(5);
-  const vp = page.viewportSize()!;
-  // Empty area right of the sphere, so only the reveal draws dots.
-  const x = vp.width * 0.86;
-  const y = vp.height * 0.3;
-  await page.mouse.move(x, y, { steps: 4 });
-  await expect.poll(() => inkAround(page, x, y, 8), { timeout: 15_000 }).toBeGreaterThan(20);
-  await page.waitForTimeout(800);
-  // Radial profile: biggest at the pointer, shrinking outward, gone by ~110px, with no sudden step (no hard ring).
-  const profile: number[] = [];
-  // 20px windows: smaller ones alias with the 7px dot grid.
-  for (let d = 0; d <= 130; d += 10) profile.push(await inkAround(page, x - d, y, 10));
-  for (let i = 1; i < profile.length; i++) expect(profile[i]).toBeLessThanOrEqual(profile[i - 1] * 1.15 + 1);
-  for (let i = 1; i < profile.length; i++) expect(profile[i - 1] - profile[i]).toBeLessThan(profile[0] * 0.45);
-  expect(profile[11]).toBeLessThan(profile[0] * 0.05);
+/** Samples halftone ink in 20px windows along a line left of (x, y), every `every` ms for `ms`,
+ *  re-sending pointermove at (x, y) so the hover never goes idle. Returns one profile per snapshot. */
+async function sampleProfiles(page: Page, x: number, y: number, ms: number, every = 100) {
+  return page.evaluate(
+    ([x, y, ms, every]) =>
+      new Promise<number[][]>((resolve) => {
+        const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+        const ctx = c.getContext('2d')!;
+        const k = c.width / c.clientWidth;
+        const ink = (cx: number) => {
+          const d = ctx.getImageData((cx - 10) * k, (y - 10) * k, 20 * k, 20 * k).data;
+          let a = 0;
+          for (let i = 3; i < d.length; i += 4) a += d[i];
+          return a / (d.length / 4);
+        };
+        const out: number[][] = [];
+        const t0 = performance.now();
+        const id = setInterval(() => {
+          window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y }));
+          const row: number[] = [];
+          for (let d = 0; d <= 130; d += 10) row.push(ink(x - d));
+          out.push(row);
+          if (performance.now() - t0 > ms) {
+            clearInterval(id);
+            resolve(out);
+          }
+        }, every);
+      }),
+    [x, y, ms, every] as const,
+  );
+}
+
+test.describe('hover halftone (user)', () => {
+  test.skip(({ isMobile }) => isMobile, 'pointer');
+  // Empty area right of the sphere, so only the hover draws dots.
+  const spot = (page: Page) => ({ x: page.viewportSize()!.width * 0.86, y: page.viewportSize()!.height * 0.3 });
+
+  test('a tight spot that fades out smoothly; narrow band along the orbits', async ({ page }) => {
+    await page.goto('/');
+    const dots = page.locator('canvas[data-halftone]');
+    expect(Number(await dots.getAttribute('data-reveal'))).toBeLessThanOrEqual(40);
+    expect(Number(await dots.getAttribute('data-band'))).toBeLessThanOrEqual(5);
+    const { x, y } = spot(page);
+    await page.mouse.move(x, y, { steps: 4 });
+    await expect.poll(() => inkAround(page, x, y, 8), { timeout: 15_000 }).toBeGreaterThan(20);
+    // Average over one ripple period so the travelling ring smooths out; what remains is the spot's falloff.
+    const period = Number(await dots.getAttribute('data-ripple')) * 1000;
+    const rows = await sampleProfiles(page, x, y, period);
+    const profile = rows[0].map((_, i) => rows.reduce((s, r) => s + r[i], 0) / rows.length);
+    for (let i = 1; i < profile.length; i++) expect(profile[i]).toBeLessThanOrEqual(profile[i - 1] * 1.15 + 1);
+    for (let i = 1; i < profile.length; i++) expect(profile[i - 1] - profile[i]).toBeLessThan(profile[0] * 0.45);
+    expect(profile[11]).toBeLessThan(profile[0] * 0.08);
+  });
+
+  test('ripples spread out from the pointer at a steady interval', async ({ page }) => {
+    await page.goto('/');
+    const { x, y } = spot(page);
+    await page.mouse.move(x, y, { steps: 4 });
+    await expect.poll(() => inkAround(page, x, y, 8), { timeout: 15_000 }).toBeGreaterThan(20);
+    const period = Number(await page.locator('canvas[data-halftone]').getAttribute('data-ripple'));
+    expect(period).toBeGreaterThan(0.8);
+    expect(period).toBeLessThan(3);
+    // 60px out, past the spot's core: ink rises as each ring passes and falls between rings.
+    const at60 = (await sampleProfiles(page, x, y, period * 2000, 60)).map((r) => r[6]);
+    expect(Math.max(...at60)).toBeGreaterThan(Math.min(...at60) * 1.6 + 2);
+  });
+
+  test('fades away when the pointer rests, and comes back when it moves', async ({ page }) => {
+    await page.goto('/');
+    const dots = page.locator('canvas[data-halftone]');
+    const { x, y } = spot(page);
+    await page.mouse.move(x, y, { steps: 4 });
+    await expect.poll(() => inkAround(page, x, y, 8), { timeout: 15_000 }).toBeGreaterThan(20);
+    const idle = Number(await dots.getAttribute('data-idle'));
+    expect(idle).toBeGreaterThanOrEqual(1000);
+    expect(idle).toBeLessThanOrEqual(4000);
+    // Still visible shortly after the last move.
+    await page.waitForTimeout(idle * 0.5);
+    expect(Number(await dots.getAttribute('data-hover'))).toBeGreaterThan(0.8);
+    // Gone after resting.
+    await expect.poll(async () => Number(await dots.getAttribute('data-hover')), { timeout: idle + 4000 }).toBeLessThan(0.05);
+    expect(await inkAround(page, x, y, 8)).toBeLessThan(3);
+    // Moving again brings it back.
+    await page.mouse.move(x - 4, y + 2, { steps: 2 });
+    await expect.poll(() => inkAround(page, x - 4, y + 2, 8), { timeout: 5000 }).toBeGreaterThan(20);
+  });
 });

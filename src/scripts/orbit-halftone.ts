@@ -30,6 +30,12 @@ const DESK_PITCH = 7; // halftone cell, CSS px (tighter spacing, user)
 const PHONE_PITCH = 4; // phones: tighter again (user)
 // Pointer reveal: a tight spot whose dots are biggest at the pointer and shrink with distance (user).
 const REVEAL_SIGMA = 38; // smaller spot (user)
+// A ripple ring leaves the pointer every RIPPLE_PERIOD seconds and fades as it spreads (user).
+const RIPPLE_PERIOD = 1.6;
+const RIPPLE_REACH = 120; // px the ring travels
+const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
+// The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
+const IDLE_MS = 1800;
 // Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
 const BAND = 4.5;
 const PHONE_BAND = 3;
@@ -68,6 +74,7 @@ export function mountOrbitHalftone(opts: Opts) {
   let h = 0;
   const pose = { yaw: 0, pitch: 0, ty: 0, tp: 0 };
   const ptr = { x: -9999, y: -9999, tx: -9999, ty: -9999, on: 0, ton: 0 };
+  let lastMove = 0; // last pointer move (ms), for the idle fade-out
   dots.dataset.dotColor = opts.dotColor;
 
   // Phone band (canvas coordinates) the sphere must fit in; null = whole canvas.
@@ -236,19 +243,30 @@ export function mountOrbitHalftone(opts: Opts) {
     // Diameter stays below the spacing so dots never touch.
     const max = w < 768 ? 1.3 : 3.0;
     const buckets = new Map<number, number[]>();
+    // Ripple: one ring per period, born at the pointer, fading as it spreads.
+    const phase = (t / RIPPLE_PERIOD) % 1;
+    const ringR = 10 + phase * RIPPLE_REACH;
+    const ringAmp = 0.95 * (1 - phase) ** 1.2 * Math.min(1, phase * 8);
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
         let a = Math.min(1, field[yy * cols + xx]);
         if (mode === 'none') continue;
         if (subtle) {
-          // Faint along the orbits; the pointer reveals the halftone around it.
-          const px = xx * PITCH + PITCH / 2 - ptr.x;
-          const py = yy * PITCH + PITCH / 2 - ptr.y;
-          const reveal = ptr.on * Math.exp(-(px * px + py * py) / (2 * REVEAL_SIGMA * REVEAL_SIGMA));
-          // Size follows distance: full dots at the pointer, shrinking outward. Screen-blended with
-          // the orbit dots so the spot and the orbits meet without a crease.
           const base = a * 0.75;
-          a = Math.min(1, base + reveal * 1.05 * (1 - base));
+          a = base;
+          if (ptr.on > 0.01) {
+            // Faint along the orbits; the pointer reveals the halftone around it.
+            const px = xx * PITCH + PITCH / 2 - ptr.x;
+            const py = yy * PITCH + PITCH / 2 - ptr.y;
+            const d2 = px * px + py * py;
+            const reveal = Math.exp(-d2 / (2 * REVEAL_SIGMA * REVEAL_SIGMA));
+            const dr = Math.sqrt(d2) - ringR;
+            const ring = ringAmp * Math.exp(-(dr * dr) / (2 * RIPPLE_WIDTH * RIPPLE_WIDTH));
+            // Size follows distance: full dots at the pointer, shrinking outward, plus the travelling
+            // ripple. Screen-blended with the orbit dots so the spot and the orbits meet without a crease.
+            // The spot stays a little lighter than the ring so each ripple reads as it passes through.
+            a = Math.min(1, base + ptr.on * Math.min(1, reveal * 0.7 + ring) * (1 - base));
+          }
         }
         if (a < 0.06) continue;
         const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow(Math.max(0, a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
@@ -278,6 +296,9 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);
+    dots.dataset.ripple = String(RIPPLE_PERIOD);
+    dots.dataset.idle = String(IDLE_MS);
+    dots.dataset.hover = ptr.on.toFixed(2);
     dots.dataset.band = String(band);
     dots.dataset.reveal = String(REVEAL_SIGMA);
     dots.dataset.readback = 'none';
@@ -418,6 +439,7 @@ export function mountOrbitHalftone(opts: Opts) {
       ptr.tx = e.clientX - r.left;
       ptr.ty = e.clientY - r.top;
       ptr.ton = 1;
+      lastMove = performance.now();
       if (ptr.x < -1000) {
         ptr.x = ptr.tx;
         ptr.y = ptr.ty;
@@ -439,7 +461,9 @@ export function mountOrbitHalftone(opts: Opts) {
     pose.pitch += (pose.tp - pose.pitch) * 0.08;
     ptr.x += (ptr.tx - ptr.x) * 0.2;
     ptr.y += (ptr.ty - ptr.y) * 0.2;
-    ptr.on += (ptr.ton - ptr.on) * 0.1;
+    // Resting pointer: let the hover halftone fade away (about a second) until it moves again.
+    if (ptr.ton && now - lastMove > IDLE_MS) ptr.ton = 0;
+    ptr.on += (ptr.ton - ptr.on) * (ptr.ton ? 0.1 : 0.06);
     draw(Math.max(0, (now - start) / 1000));
   };
   requestAnimationFrame(loop);
