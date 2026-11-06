@@ -25,6 +25,19 @@ export function parseInstagramPost(html: string): InstagramPost {
   const image = jsonString(html, 'display_url');
   if (video) post.videoUrl = video;
   if (image) post.imageUrl = image;
+  // Some embed pages carry no JSON at all, only the rendered <img>: take its largest srcset entry,
+  // and its play-button sprite tells a video from a photo.
+  if (!post.imageUrl) {
+    const tag = html.match(/<img class="EmbeddedMediaImage"[^>]*>/)?.[0];
+    if (tag) {
+      const unescape = (u: string) => u.replace(/&amp;/g, '&');
+      const srcset = tag.match(/srcset="([^"]*)"/)?.[1] ?? '';
+      const best = [...srcset.matchAll(/(https:\/\/[^\s,]+)\s+(\d+)w/g)].sort((a, b) => Number(b[2]) - Number(a[2]))[0]?.[1];
+      const src = best ?? tag.match(/\ssrc="([^"]*)"/)?.[1];
+      if (src) post.imageUrl = unescape(src);
+      if (/PlayButtonSprite/.test(html)) post.isVideo = true;
+    }
+  }
   return post;
 }
 

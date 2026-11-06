@@ -71,6 +71,21 @@ const io = (sizes: Record<string, number> = {}) => ({
   },
 });
 
+describe('embed pages without the JSON data (user: no Instagram frame, just the work)', () => {
+  const img =
+    '<img class="EmbeddedMediaImage" alt="Instagram post shared by &#064;juwon" src="https://cdn.ig/s.jpg?a=1&amp;b=2" ' +
+    'srcset="https://cdn.ig/l.jpg?x=1&amp;y=2 1440w,https://cdn.ig/m.jpg 1080w,https://cdn.ig/s.jpg 640w" />';
+  it('a photo post uses the largest image from the srcset', () => {
+    expect(parseInstagramPost(`<div>${img}</div>`)).toEqual({ imageUrl: 'https://cdn.ig/l.jpg?x=1&y=2' });
+  });
+  it('a play button marks it as a video', () => {
+    expect(parseInstagramPost(`<div>${img}<span class="Sprite PlayButtonSprite img"></span></div>`)).toEqual({
+      imageUrl: 'https://cdn.ig/l.jpg?x=1&y=2',
+      isVideo: true,
+    });
+  });
+});
+
 describe('localizeInstagram', () => {
   it('replaces Instagram embeds with the original video or image, keeping a link to the post', async () => {
     const out = await localizeInstagram(site(), dir, warn, io());
