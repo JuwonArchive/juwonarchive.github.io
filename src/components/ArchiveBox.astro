@@ -16,7 +16,7 @@ const num = String(index + 1).padStart(2, '0');
       <span class="glow"></span>
       <span class="f back"></span>
       <span class="f left"></span>
-      <span class="card">
+      <span class="card" style={work.cover?.width && work.cover?.height ? `--ar:${(work.cover.width / work.cover.height).toFixed(4)}` : undefined}>
         {
           work.cover ? (
             <img src={work.cover.src} width={work.cover.width} height={work.cover.height} alt="" loading="lazy" decoding="async" />
@@ -120,9 +120,11 @@ const num = String(index + 1).padStart(2, '0');
     background: radial-gradient(closest-side, var(--tint), transparent);
     filter: blur(4px);
   }
+  /* The card takes the cover's own shape, as large as fits in the box: nothing is cropped (user). */
   .card {
-    width: calc(var(--W) * 0.72);
-    height: calc(var(--H) * 0.78);
+    --ar: 1.2923; /* no cover: the box's own card shape */
+    width: min(calc(var(--W) * 0.72), calc(var(--H) * 0.78 * var(--ar)));
+    aspect-ratio: var(--ar);
     overflow: hidden;
     border-radius: 3px;
     background: var(--tint);
@@ -133,7 +135,7 @@ const num = String(index + 1).padStart(2, '0');
   .card img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
   }
   .card-title {
     display: grid;

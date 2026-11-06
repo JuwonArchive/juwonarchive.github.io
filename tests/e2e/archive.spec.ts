@@ -74,3 +74,28 @@ test.describe('opening a box', () => {
     await expect(page).toHaveURL(new RegExp(`/archive/${site.works[1].slug}/?$`), { timeout: 1500 });
   });
 });
+
+test('each cover sits whole inside its box: its own shape, nothing cropped (user)', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/archive');
+  const cards = page.locator('a[data-archive-box] .card:has(img)');
+  const n = await cards.count();
+  expect(n).toBeGreaterThan(0);
+  for (let i = 0; i < n; i++) {
+    const r = await cards.nth(i).evaluate(async (card) => {
+      const img = card.querySelector('img')!;
+      img.loading = 'eager';
+      if (!img.complete) await new Promise((res) => img.addEventListener('load', res, { once: true }));
+      // Untransformed layout size (the box is drawn in 3D).
+      return {
+        card: card.offsetWidth / card.offsetHeight,
+        img: img.naturalWidth / img.naturalHeight,
+        fit: getComputedStyle(img).objectFit,
+        fitsW: card.offsetWidth <= (card.parentElement as HTMLElement).offsetWidth * 0.73,
+      };
+    });
+    expect(r.fit).not.toBe('cover');
+    expect(Math.abs(r.card - r.img) / r.img).toBeLessThan(0.03);
+    expect(r.fitsW).toBe(true);
+  }
+});
