@@ -35,7 +35,7 @@ const RIPPLE_PERIOD = 1.6;
 const RIPPLE_REACH = 120; // px the ring travels
 const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
 // The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
-const IDLE_MS = 1800;
+const IDLE_MS = 3000; // 3s of rest before the hover halftone fades (user)
 // Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
 const BAND = 4.5;
 const PHONE_BAND = 3;
