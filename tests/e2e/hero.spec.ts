@@ -470,3 +470,42 @@ test('burst dots fade: lighter as well as smaller away from the crossing (user)'
   const avg = (xs: [number, number][]) => xs.reduce((s, p) => s + p[1], 0) / xs.length;
   expect(avg(sorted.slice(-q))).toBeGreaterThan(avg(sorted.slice(0, q)) * 1.3);
 });
+
+test('a burst travels like a wave: it starts at the crossing and the middle clears first (user)', async ({ page, isMobile }) => {
+  await page.goto('/');
+  await page.waitForTimeout(2500);
+  const dots = page.locator('canvas[data-halftone]');
+  // Sample, inside the page, the ink right at the crossing and the total ink, every animation frame.
+  if (!isMobile) await page.mouse.move(60, 450);
+  // Keep turning the sphere until the first burst (stops itself once one has happened).
+  if (!isMobile) page.evaluate(async () => { const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!; for (let i = 0; i < 300 && !Number(c.dataset.bursts); i++) { window.dispatchEvent(new PointerEvent('pointermove', { clientX: 60 + (i % 100) * 13, clientY: 450 })); await new Promise((r) => setTimeout(r, 50)); } }).catch(() => {});
+  const series = await dots.evaluate(async (c: HTMLCanvasElement) => {
+    let prev = 0;
+    for (let i = 0; i < 1200; i++) {
+      const n = Number(c.dataset.bursts);
+      if (n > prev) break;
+      prev = n;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const [bx, by] = (c.dataset.lastBurst ?? '0,0').split(',').map(Number);
+    const k = c.width / c.clientWidth;
+    const ink = (x: number, y: number, half: number) => {
+      const d = c.getContext('2d')!.getImageData((x - half) * k, (y - half) * k, half * 2 * k, half * 2 * k).data;
+      let a = 0;
+      for (let i = 3; i < d.length; i += 4) a += d[i];
+      return a / (d.length / 4);
+    };
+    const out: { t: number; centre: number }[] = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < 700) {
+      out.push({ t: performance.now() - t0, centre: ink(bx, by, 10) });
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    return out;
+  });
+  const peak = Math.max(...series.filter((s) => s.t < 250).map((s) => s.centre));
+  const late = series.filter((s) => s.t > 450).map((s) => s.centre);
+  expect(peak).toBeGreaterThan(1);
+  // The middle has emptied while the wave is still out on the lines.
+  expect(Math.max(...late)).toBeLessThan(peak * 0.35);
+});

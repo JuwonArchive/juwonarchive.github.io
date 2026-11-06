@@ -45,8 +45,9 @@ const BAND = 4.5;
 const PHONE_BAND = 3;
 // Crossing bursts (user): when two lines meet, halftone shoots out along both lines and fades away.
 const MIN_CROSS_ANGLE = (28 * Math.PI) / 180; // shallower meetings are lines running side by side
-const BURST_S = 0.9; // whole life of a burst
-const BURST_SPREAD_S = 0.35; // time to shoot out to full length
+const BURST_S = 1.0; // whole life of a burst (the wave reaches its end as it fades out)
+const BURST_BAND = 14; // length of the travelling wave band along the line (σ, px)
+const BURST_BAND_PHONE = 7;
 const BURST_REACH = 120; // px along each line, each way
 const BURST_REACH_PHONE = 55;
 const BURST_WIDTH = 4; // σ at the crossing, px
@@ -101,12 +102,15 @@ export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: n
   return out;
 }
 
-/** Points along `pts` within `half` px of arc length either side of a crossing, with taper w = 1 − (s/half)². */
-export function strokeSamples(pts: Pt[], i: number, t: number, half: number, step: number): { x: number; y: number; w: number }[] {
+/**
+ * Points along `pts` within `half` px of arc length either side of a crossing: `d` is the distance along the
+ * line from the crossing, and w = 1 − (d/half)² a taper from the middle to the tips.
+ */
+export function strokeSamples(pts: Pt[], i: number, t: number, half: number, step: number): { x: number; y: number; w: number; d: number }[] {
   const at = (k: number, f: number) => ({ x: pts[k - 1].x + (pts[k].x - pts[k - 1].x) * f, y: pts[k - 1].y + (pts[k].y - pts[k - 1].y) * f });
-  const out: { x: number; y: number; w: number }[] = [];
+  const out: { x: number; y: number; w: number; d: number }[] = [];
   const centre = at(i, t);
-  out.push({ ...centre, w: 1 });
+  out.push({ ...centre, w: 1, d: 0 });
   for (const dir of [1, -1]) {
     let s = 0;
     let next = step;
@@ -121,7 +125,7 @@ export function strokeSamples(pts: Pt[], i: number, t: number, half: number, ste
         const x = cur.x + (target.x - cur.x) * r;
         const y = cur.y + (target.y - cur.y) * r;
         const q = next / half;
-        out.push({ x, y, w: 1 - q * q });
+        out.push({ x, y, w: 1 - q * q, d: next });
         next += step;
       }
       s += seg;
@@ -361,16 +365,21 @@ export function mountOrbitHalftone(opts: Opts) {
       if (!(age < BURST_S) || !track.now[n].ring || bursts >= MAX_BURSTS) return;
       bursts++;
       if (age < 0.05) dots.dataset.lastBurst = `${Math.round(c.x)},${Math.round(c.y)}`;
-      // Shoots out fast (ease-out over BURST_SPREAD_S), then fades over the rest of BURST_S.
-      const spread = 1 - (1 - Math.min(1, age / BURST_SPREAD_S)) ** 3;
-      const fadeOut = (1 - age / BURST_S) ** 1.5;
-      const len = reach * spread;
-      if (len < step) return;
+      // A wave (user): it starts at the crossing, its front travels out along both lines, and the middle
+      // empties first. The front eases out to `reach`; the band thins and fades as it goes.
+      const k01 = age / BURST_S;
+      const front = reach * (1 - (1 - k01) ** 2);
+      const band = Math.max(step * 1.2, (phone ? BURST_BAND_PHONE : BURST_BAND) * (1 - 0.5 * k01));
+      const fadeOut = (1 - k01) ** 0.9; // stays visible while it travels
+      const len = Math.min(reach + band, front + 2.5 * band);
       for (const [line, k, f] of [[c.a, c.i, c.t], [c.b, c.j, c.u]] as const) {
         for (const p of strokeSamples(line, k, f, len, step)) {
-          const radius = widest * (0.2 + 0.8 * p.w);
-          // Peak ink ≈ p.w × fadeOut for a line of splats `step` apart with σ = radius.
-          splat(p.x, p.y, ((p.w * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * fadeOut, radius);
+          const off = (p.d - front) / band;
+          const wave = Math.exp(-0.5 * off * off);
+          if (wave < 0.03) continue;
+          const radius = widest * (0.35 + 0.65 * (1 - k01));
+          // Peak ink ≈ wave × fadeOut for a line of splats `step` apart with σ = radius.
+          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * fadeOut, radius);
         }
       }
     });
