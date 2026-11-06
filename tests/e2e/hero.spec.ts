@@ -216,7 +216,9 @@ test.describe('home graphics', () => {
     const b = await read();
     const moved = a.map((o, i) => Math.abs(b[i][0] - o[0]) + Math.abs(b[i][1] - o[1]));
     for (const m of moved) expect(m).toBeGreaterThan(0.02); // every orbit moves…
-    expect(new Set(moved.map((m) => m.toFixed(3))).size).toBe(3); // …each at its own pace
+    // …each at its own pace and way: the planes precess at different rates (signed), so compare those.
+    const spin = a.map((o, i) => b[i][1] - o[1]);
+    for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) expect(Math.abs(spin[i] - spin[j])).toBeGreaterThan(0.01);
   });
 
   test('axes run on to the edges and a live readout fills the empty space, fitted to desktop and phones (user)', async ({ page, isMobile }) => {
