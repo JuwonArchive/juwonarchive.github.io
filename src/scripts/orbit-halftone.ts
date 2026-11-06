@@ -44,6 +44,13 @@ const TILT_BOTTOM = 0.75;
 // Touch drag: a full screen width turns the sphere this much (rad); a full screen height tilts it this much.
 const DRAG_YAW = 3.2;
 const DRAG_TILT = 2.4;
+// Orbit drift (user): base tilt (ax around x, az around z), how far and how fast the tilt sways, how fast the
+// plane precesses (rad/s, signs differ), and a phase so they never move in step. Slow: a full sway takes ~1 min.
+const ORBIT_DRIFT = [
+  { ax: 1.15, az: 0.35, sway: 0.35, swayRate: 0.11, spin: 0.045, phase: 0 },
+  { ax: 0.55, az: -0.9, sway: 0.3, swayRate: 0.083, spin: -0.06, phase: 2.1 },
+  { ax: 1.45, az: 1.25, sway: 0.4, swayRate: 0.067, spin: 0.035, phase: 4.2 },
+];
 const IDLE_MS = 3000; // 3s of rest before the hover halftone fades (user)
 // Beyond this distance neither the spot (4σ) nor the ripple ring reaches.
 const REACH = Math.max(4 * REVEAL_SIGMA, 10 + RIPPLE_REACH + 3 * RIPPLE_WIDTH);
@@ -268,11 +275,11 @@ export function mountOrbitHalftone(opts: Opts) {
       const k = 4 / (4 - z);
       return { x: cx + x * R * k, y: cy + y * R * k, z };
     };
-    const orbits = [
-      ring(1, 1.15, 0.35),
-      ring(1, 0.55, -0.9),
-      ring(1, 1.45, 1.25),
-    ].map((o) => o.map(project));
+    // Each orbit drifts on its own (user): its tilt sways and its plane slowly precesses, at different speeds
+    // and directions, so the crossings keep moving and the halftone waves come up in new places.
+    const orbits = ORBIT_DRIFT.map(({ ax, az, sway, swayRate, spin, phase }) =>
+      ring(1, ax + sway * Math.sin(t * swayRate + phase), az + spin * t),
+    ).map((o) => o.map(project));
     const dashed = [ring(1, Math.PI / 2, 0), ring(1, Math.PI / 2, Math.PI / 2)].map((o) => o.map(project));
     const centre = [ring(0.62, 0.05, 0), ring(0.3, 0.05, 0)].map((o) => o.map(project));
     // Wireframe: parallels and meridians.
@@ -641,6 +648,7 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.r = String(Math.round(g.R));
     dots.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
     dots.dataset.tilt = (BASE_TILT + pose.pitch).toFixed(2);
+    dots.dataset.orbitDrift = ORBIT_DRIFT.map((o) => `${(o.ax + o.sway * Math.sin(t * o.swayRate + o.phase)).toFixed(3)}/${(o.az + o.spin * t).toFixed(3)}`).join(' ');
   };
 
   resize();

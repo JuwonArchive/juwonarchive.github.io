@@ -20,10 +20,13 @@ async function inkAround(page: Page, x: number, y: number, half = 40) {
 /** Turn the sphere (desktop: sweep the pointer; phones turn on their own) until a crossing bursts. */
 async function waitForBurst(page: Page, isMobile: boolean) {
   const dots = page.locator('canvas[data-halftone]');
+  // A *new* wave: the recorded start of the latest wave changes (waves are frequent now that orbits drift).
+  const key = async () => `${await dots.getAttribute('data-last-burst')}|${await dots.getAttribute('data-last-strength')}`;
+  const before = await key();
   if (!isMobile) await page.mouse.move(60, 450);
   for (let i = 0; i < 400; i++) {
     if (!isMobile) await page.mouse.move(60 + (i % 100) * 13, 450);
-    if (Number(await dots.getAttribute('data-bursts')) > 0) return;
+    if ((await key()) !== before) return;
     await page.waitForTimeout(40);
   }
   throw new Error('no burst within 16s');
@@ -201,6 +204,19 @@ test.describe('home graphics', () => {
     await expect.poll(async () => Math.abs((await state()).yaw - mid.yaw), { timeout: 5000 }).toBeGreaterThan(0.8);
     // The home itself does not scroll or zoom under the finger.
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('main.home')!).touchAction)).toBe('none');
+  });
+
+  test('each orbit drifts on its own, so crossings keep moving (user)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(2500);
+    const read = () =>
+      page.locator('canvas[data-halftone]').evaluate((c: HTMLCanvasElement) => c.dataset.orbitDrift!.split(' ').map((o) => o.split('/').map(Number)));
+    const a = await read();
+    await page.waitForTimeout(3000);
+    const b = await read();
+    const moved = a.map((o, i) => Math.abs(b[i][0] - o[0]) + Math.abs(b[i][1] - o[1]));
+    for (const m of moved) expect(m).toBeGreaterThan(0.02); // every orbit moves…
+    expect(new Set(moved.map((m) => m.toFixed(3))).size).toBe(3); // …each at its own pace
   });
 
   test('no background fog: plain white page', async ({ page }) => {
@@ -531,11 +547,10 @@ test('a burst travels like a wave: it starts at the crossing and the middle clea
   // Keep turning the sphere until the first burst (stops itself once one has happened).
   if (!isMobile) page.evaluate(async () => { const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!; for (let i = 0; i < 300 && !Number(c.dataset.bursts); i++) { window.dispatchEvent(new PointerEvent('pointermove', { clientX: 60 + (i % 100) * 13, clientY: 450 })); await new Promise((r) => setTimeout(r, 50)); } }).catch(() => {});
   const series = await dots.evaluate(async (c: HTMLCanvasElement) => {
-    let prev = 0;
-    for (let i = 0; i < 1200; i++) {
-      const n = Number(c.dataset.bursts);
-      if (n > prev) break;
-      prev = n;
+    // Wait for a new wave to start (its recorded start changes).
+    const start = `${c.dataset.lastBurst}|${c.dataset.lastStrength}`;
+    for (let i = 0; i < 1500; i++) {
+      if (`${c.dataset.lastBurst}|${c.dataset.lastStrength}` !== start) break;
       await new Promise((r) => requestAnimationFrame(r));
     }
     const [bx, by] = (c.dataset.lastBurst ?? '0,0').split(',').map(Number);
@@ -567,11 +582,10 @@ test('a wave spreads slowly and its dots shrink gradually, not only at the end (
   if (!isMobile) await page.mouse.move(60, 450);
   if (!isMobile) page.evaluate(async () => { const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!; for (let i = 0; i < 300 && !Number(c.dataset.bursts); i++) { window.dispatchEvent(new PointerEvent('pointermove', { clientX: 60 + (i % 100) * 13, clientY: 450 })); await new Promise((r) => setTimeout(r, 50)); } }).catch(() => {});
   const series = await page.locator('canvas[data-halftone]').evaluate(async (c: HTMLCanvasElement) => {
-    let prev = 0;
-    for (let i = 0; i < 1200; i++) {
-      const n = Number(c.dataset.bursts);
-      if (n > prev) break;
-      prev = n;
+    // Wait for a new wave to start (its recorded start changes).
+    const start = `${c.dataset.lastBurst}|${c.dataset.lastStrength}`;
+    for (let i = 0; i < 1500; i++) {
+      if (`${c.dataset.lastBurst}|${c.dataset.lastStrength}` !== start) break;
       await new Promise((r) => requestAnimationFrame(r));
     }
     const out: { t: number; dot: number; bursts: number }[] = [];
