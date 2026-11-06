@@ -595,11 +595,17 @@ export function mountOrbitHalftone(opts: Opts) {
         lctx.lineTo(g.cx + dx * (g.R + 18), g.cy + dy * (g.R + 18));
         lctx.stroke();
       }
-      // Desktop (user): the axes run on towards the screen edges like a technical drawing — dotted, with a
-      // tick every 40px (longer every 200px) and a small label at each end — so the white reads as layout.
-      if (w >= 768) {
-        const m = 32; // stay clear of the corner text
-        const x0 = m, x1 = w - m, y0 = 72, y1 = h - 72;
+      // The axes run on towards the screen edges like a technical drawing — dotted, with ticks and a small label
+      // at each end — so the white reads as layout (user). Phones: finer ticks, the vertical axis runs up to the
+      // top bar and down only as far as the readout under the sphere.
+      {
+        const phoneAxes = w < 768;
+        const m = phoneAxes ? 16 : 32; // stay clear of the corner text
+        const x0 = m, x1 = w - m;
+        const y0 = phoneAxes && band ? band.top : 72;
+        const y1 = phoneAxes ? g.cy + g.R + 34 : h - 72;
+        const every = phoneAxes ? 20 : 40;
+        const longEvery = phoneAxes ? 100 : 200;
         lctx.save();
         lctx.globalAlpha = 0.45;
         lctx.lineWidth = 0.7;
@@ -627,18 +633,18 @@ export function mountOrbitHalftone(opts: Opts) {
           }
           lctx.stroke();
         };
-        for (let d = 40; g.cx - d >= x0 || g.cx + d <= x1; d += 40) {
+        for (let d = every; g.cx - d >= x0 || g.cx + d <= x1; d += every) {
           if (d <= g.R + 22) continue;
-          if (g.cx - d >= x0) tick(g.cx - d, g.cy, true, d % 200 === 0);
-          if (g.cx + d <= x1) tick(g.cx + d, g.cy, true, d % 200 === 0);
+          if (g.cx - d >= x0) tick(g.cx - d, g.cy, true, d % longEvery === 0);
+          if (g.cx + d <= x1) tick(g.cx + d, g.cy, true, d % longEvery === 0);
         }
-        for (let d = 40; g.cy - d >= y0 || g.cy + d <= y1; d += 40) {
+        for (let d = every; g.cy - d >= y0 || g.cy + d <= y1; d += every) {
           if (d <= g.R + 22) continue;
-          if (g.cy - d >= y0) tick(g.cx, g.cy - d, false, d % 200 === 0);
-          if (g.cy + d <= y1) tick(g.cx, g.cy + d, false, d % 200 === 0);
+          if (g.cy - d >= y0) tick(g.cx, g.cy - d, false, d % longEvery === 0);
+          if (g.cy + d <= y1) tick(g.cx, g.cy + d, false, d % longEvery === 0);
         }
         lctx.globalAlpha = 0.6;
-        lctx.font = '9px "Geist Mono Variable", ui-monospace, monospace';
+        lctx.font = `${phoneAxes ? 8 : 9}px "Geist Mono Variable", ui-monospace, monospace`;
         lctx.textBaseline = 'middle';
         lctx.textAlign = 'left';
         lctx.fillText('X−', x0, g.cy - 12);
@@ -646,7 +652,7 @@ export function mountOrbitHalftone(opts: Opts) {
         lctx.fillText('X+', x1, g.cy - 12);
         lctx.textAlign = 'left';
         lctx.fillText('Y+', g.cx + 8, y0);
-        lctx.fillText('Y−', g.cx + 8, y1);
+        if (!phoneAxes) lctx.fillText('Y−', g.cx + 8, y1);
         lctx.restore();
         lines.dataset.axes = 'extended';
       }

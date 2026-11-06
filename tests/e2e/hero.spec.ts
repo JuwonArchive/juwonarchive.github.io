@@ -219,15 +219,28 @@ test.describe('home graphics', () => {
     expect(new Set(moved.map((m) => m.toFixed(3))).size).toBe(3); // …each at its own pace
   });
 
-  test('desktop: axes run on to the edges and a live readout fills the right side; phones keep it clean (user)', async ({ page, isMobile }) => {
+  test('axes run on to the edges and a live readout fills the empty space, fitted to desktop and phones (user)', async ({ page, isMobile }) => {
     await page.goto('/');
     await page.waitForTimeout(1500);
     const readout = page.locator('[data-readout]');
     if (isMobile) {
+      // Phones (user): the same idea, fitted — axes extended and a compact readout under the sphere, above JUWON.
       await expect(readout).toBeHidden();
-      await expect(page.locator('canvas[data-trace]')).not.toHaveAttribute('data-axes', 'extended');
+      await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-axes', 'extended');
+      const rm = page.locator('[data-readout-m]');
+      await expect(rm).toBeVisible();
+      await expect(rm).toContainText(/CROSSINGS \d\d · WAVES \d\d/);
+      const r = (await rm.boundingBox())!;
+      const h1 = (await page.locator('.home h1').boundingBox())!;
+      const sphereBottom = await page.evaluate(() => {
+        const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+        return c.getBoundingClientRect().top + Number(c.dataset.cy) + Number(c.dataset.r);
+      });
+      expect(r.y).toBeGreaterThan(sphereBottom);
+      expect(r.y + r.height).toBeLessThan(h1.y);
       return;
     }
+    await expect(page.locator('[data-readout-m]')).toBeHidden();
     await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-axes', 'extended');
     await expect(readout).toBeVisible();
     // Live: the orbit values change as the orbits drift.
