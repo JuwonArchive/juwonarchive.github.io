@@ -193,3 +193,4 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - Idle: after the pointer rests 3s the hover halftone fades out (~1s); the next move brings it back.
 - Instagram videos whose file Instagram withholds (usually library music) show their cover with a centred "▶ PLAY ON INSTAGRAM" pill linking to the post; too-large videos stay embeds. Original files uploaded to Notion always play on the site.
 - Archive boxes: the card takes the cover's own shape (largest that fits), so covers are never cropped.
+- Instagram carousels: every slide is shown in order (videos, images, or play-on-Instagram covers).

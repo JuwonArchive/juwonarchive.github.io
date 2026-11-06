@@ -82,7 +82,8 @@ test('each cover sits whole inside its box: its own shape, nothing cropped (user
   const n = await cards.count();
   expect(n).toBeGreaterThan(0);
   for (let i = 0; i < n; i++) {
-    const r = await cards.nth(i).evaluate(async (card) => {
+    const r = await cards.nth(i).evaluate(async (el) => {
+      const card = el as HTMLElement;
       const img = card.querySelector('img')!;
       img.loading = 'eager';
       if (!img.complete) await new Promise((res) => img.addEventListener('load', res, { once: true }));

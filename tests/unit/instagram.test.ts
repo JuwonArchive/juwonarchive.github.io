@@ -15,7 +15,31 @@ const page = (o: { w?: number; h?: number; video?: string; image?: string; isVid
   (o.isVideo || o.video ? `,\\"is_video\\":true` : '') +
   `}</script>`;
 
+/** A carousel: the first slide's fields at top level, then every slide under edge_sidecar_to_children. */
+const node = (o: { w: number; h: number; video?: string; image: string }) =>
+  `{\\"node\\":{\\"__typename\\":\\"${o.video ? 'GraphVideo' : 'GraphImage'}\\",\\"dimensions\\":{\\"height\\":${o.h},\\"width\\":${o.w}},` +
+  `\\"display_url\\":\\"${esc(o.image)}\\",\\"is_video\\":${o.video ? 'true' : 'false'}` +
+  (o.video ? `,\\"video_url\\":\\"${esc(o.video)}\\"` : '') +
+  `}}`;
+const carousel = (slides: Parameters<typeof node>[0][]) =>
+  `<script>{\\"__typename\\":\\"GraphSidecar\\",\\"dimensions\\":{\\"height\\":${slides[0].h},\\"width\\":${slides[0].w}},` +
+  `\\"display_url\\":\\"${esc(slides[0].image)}\\",\\"edge_sidecar_to_children\\":{\\"edges\\":[${slides.map(node).join(',')}]},` +
+  `\\"edge_media_to_caption\\":{}}</script>`;
+
 describe('parseInstagramPost', () => {
+  it('reads every slide of a carousel post (user: the running video is slide 2)', () => {
+    const p = parseInstagramPost(
+      carousel([
+        { w: 720, h: 406, video: 'https://cdn.ig/1.mp4', image: 'https://cdn.ig/1.jpg' },
+        { w: 1080, h: 1350, image: 'https://cdn.ig/2.jpg?a=1\\u0026b=2' },
+      ]),
+    );
+    expect(p.slides).toEqual([
+      { aspect: 720 / 406, isVideo: true, videoUrl: 'https://cdn.ig/1.mp4', imageUrl: 'https://cdn.ig/1.jpg' },
+      { aspect: 1080 / 1350, imageUrl: 'https://cdn.ig/2.jpg?a=1&b=2' },
+    ]);
+  });
+
   it('reads size, original video and image, unescaping URLs', () => {
     const p = parseInstagramPost(page({ w: 720, h: 1280, video: 'https://cdn.ig/v.mp4?a=1\\u0026b=2', image: 'https://cdn.ig/p.jpg' }));
     expect(p).toEqual({ aspect: 720 / 1280, isVideo: true, videoUrl: 'https://cdn.ig/v.mp4?a=1&b=2', imageUrl: 'https://cdn.ig/p.jpg' });
@@ -104,6 +128,23 @@ describe('localizeInstagram', () => {
     // No downloadable media: keep the embed, sized so the page can crop Instagram's frame away.
     expect(c).toMatchObject({ type: 'embed', provider: 'instagram', aspect: expect.closeTo(1080 / 607, 4) });
     expect(yt).toMatchObject({ type: 'embed', provider: 'youtube' });
+  });
+
+  it('a carousel becomes all of its slides, in order (user)', async () => {
+    pages['https://www.instagram.com/p/SSS/embed/'] = carousel([
+      { w: 720, h: 406, video: 'https://cdn.ig/s1.mp4', image: 'https://cdn.ig/s1.jpg' },
+      { w: 720, h: 406, video: 'https://cdn.ig/s2.mp4', image: 'https://cdn.ig/s2.jpg' },
+      { w: 1080, h: 1350, image: 'https://cdn.ig/s3.jpg' },
+    ]);
+    const s = site();
+    s.works[0].blocks = [{ type: 'embed', provider: 'instagram', url: 'https://www.instagram.com/p/SSS/', embedUrl: 'https://www.instagram.com/p/SSS/embed' }];
+    const out = await localizeInstagram(s, dir, warn, io());
+    expect(out.works[0].blocks.map((b) => [b.type, 'media' in b ? b.media.src : '', 'source' in b ? b.source : ''])).toEqual([
+      ['video', '/media/ig-SSS-1.mp4', 'https://www.instagram.com/p/SSS/'],
+      ['video', '/media/ig-SSS-2.mp4', 'https://www.instagram.com/p/SSS/'],
+      ['image', '/media/ig-SSS-3.webp', 'https://www.instagram.com/p/SSS/'],
+    ]);
+    expect(readdirSync(dir).sort()).toEqual(['ig-SSS-1.mp4', 'ig-SSS-2.mp4', 'ig-SSS-3.webp']);
   });
 
   it('keeps the embed and warns when Instagram cannot be read', async () => {
