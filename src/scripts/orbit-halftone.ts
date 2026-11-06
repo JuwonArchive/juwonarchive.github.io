@@ -176,11 +176,16 @@ export function waveStrength(o: { sin: number; z: number; neighbours: number; mi
  * the same orbit are spread evenly around it and move at the orbit's speed, so they never travel bunched up
  * (user). Each orbit starts at its own offset, and the middle orbit runs the other way.
  */
+/** Which way marker i travels along its orbit: +1 towards higher point indices, −1 the other way. */
+export function markerDirection(i: number): 1 | -1 {
+  return i % 3 === 1 ? -1 : 1;
+}
+
 export function markerPhaseOf(i: number, n: number, t: number): number {
   const orbit = i % 3;
   const k = Math.floor(i / 3);
   const onOrbit = Math.ceil((n - orbit) / 3);
-  const speed = 0.025 * (1 + orbit * 0.3) * (orbit === 1 ? -1 : 1);
+  const speed = 0.025 * (1 + orbit * 0.3) * markerDirection(i);
   const p = [0, 0.37, 0.71][orbit] + k / Math.max(1, onOrbit) + t * speed;
   return ((p % 1) + 1) % 1;
 }
@@ -677,7 +682,8 @@ export function mountOrbitHalftone(opts: Opts) {
         const n = orbit.length - 1;
         const f = markerPhase(i, t);
         const p = orbit[Math.floor(f * n)];
-        const q = orbit[(Math.floor(f * n) + 2) % n];
+        // The arrow points the way the marker actually travels (user: some pointed backwards).
+        const q = orbit[(Math.floor(f * n) + 2 * markerDirection(i) + n) % n];
         lctx.beginPath();
         lctx.arc(p.x, p.y, 3, 0, TAU);
         lctx.fill();

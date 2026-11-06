@@ -30,3 +30,17 @@ describe('markerPhaseOf (user: the dots travelled bunched up)', () => {
     }
   });
 });
+
+describe('marker arrows (user: some pointed against the motion)', () => {
+  it('the arrow direction matches the way each marker actually moves', async () => {
+    const { markerDirection } = await import('../../src/scripts/orbit-halftone');
+    for (let i = 0; i < 6; i++) {
+      const a = markerPhaseOf(i, 6, 10);
+      const b = markerPhaseOf(i, 6, 10.5);
+      let d = b - a;
+      if (d > 0.5) d -= 1;
+      if (d < -0.5) d += 1;
+      expect(Math.sign(d)).toBe(markerDirection(i));
+    }
+  });
+});
