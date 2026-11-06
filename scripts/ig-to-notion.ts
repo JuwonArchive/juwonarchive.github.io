@@ -20,7 +20,7 @@ import notionPkg from '@notionhq/client';
 import type { Client as NotionClient } from '@notionhq/client';
 import { fetchSnapshot } from '../src/lib/notion/fetch';
 import { mapSnapshot } from '../src/lib/notion/map';
-import { captionFromEmbed, codesIn, plan, HASHTAG_ROUTES, type IgPost } from '../src/lib/ig-route';
+import { captionFromEmbed, codesIn, parseAddList, plan, routeFor, HASHTAG_ROUTES, type IgPost } from '../src/lib/ig-route';
 import { processInbox } from '../src/lib/ig-inbox';
 import { config } from '../src/config';
 
@@ -113,6 +113,27 @@ async function runInbox(notion: NotionClient, rootId: string, rootBlocks: any[],
   );
 }
 
+// ---------- Posts handed in directly ("Run workflow" → ig_add) ----------
+
+async function runAddList(notion: NotionClient, text: string, archives: Archive[], known: Set<string>) {
+  const byTitle = new Map(archives.map((a) => [a.title.toUpperCase(), a]));
+  for (const item of parseAddList(text)) {
+    if (known.has(item.code)) {
+      summary(`- already in the archive: ${item.url}`);
+      continue;
+    }
+    const title = item.title ?? routeFor((await fetchCaption(item.url).catch(() => null)) ?? '');
+    const archive = title ? byTitle.get(title) : undefined;
+    if (!archive) {
+      summary(`- ⚠ no archive "${title ?? `(no ${TAGS})`}" for ${item.url}; tabs are: ${archives.map((a) => a.title).join(', ')}`);
+      continue;
+    }
+    summary(`- ${dryRun ? 'would add' : 'added'} → **${archive.title}**: ${item.url}`);
+    if (!dryRun) await appendPost(notion, archive.pageId, item.url);
+    known.add(item.code);
+  }
+}
+
 // ---------- A. Instagram API (professional accounts) ----------
 
 async function graph(path: string, token: string): Promise<any> {
@@ -165,6 +186,7 @@ async function main() {
   const notion = new Client({ auth: notionToken });
 
   summary(`### Instagram → Notion${dryRun ? ' (dry run)' : ''}`);
+  if (process.env.IG_ADD?.trim()) await runAddList(notion, process.env.IG_ADD, archives, known);
   await runInbox(notion, rootId, snapshot.rootBlocks, archives, known);
   if (igToken) await runApi(notion, igToken, archives, known);
 }

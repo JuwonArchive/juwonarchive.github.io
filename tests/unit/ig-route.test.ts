@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captionFromEmbed, codesIn, hashtags, plan, postUrlsIn, routeFor, shortcode, type IgPost } from '../../src/lib/ig-route';
+import { captionFromEmbed, codesIn, hashtags, parseAddList, plan, postUrlsIn, routeFor, shortcode, type IgPost } from '../../src/lib/ig-route';
 
 const pages = [
   { title: '3D DESIGN', pageId: 'p3d' },
@@ -102,5 +102,18 @@ describe('INBOX helpers (user: personal account, share to Notion)', () => {
       ['AAA', 'https://www.instagram.com/reel/AAA/'],
       ['BBB', 'https://www.instagram.com/p/BBB/'],
     ]);
+  });
+});
+
+describe('posts handed in directly (user: "put this in AI GENERATED")', () => {
+  it('reads "URL => TAB" entries, one per line or ";", with or without a tab', () => {
+    const list = parseAddList(
+      'https://www.instagram.com/reel/DctbX_pJLq7/?utm_source=ig_web_copy_link&srtk=x => ai generated; https://instagram.com/p/BBB/\nnot a link => 3D DESIGN',
+    );
+    expect(list).toEqual([
+      { url: 'https://www.instagram.com/reel/DctbX_pJLq7/', code: 'DctbX_pJLq7', title: 'AI GENERATED' },
+      { url: 'https://www.instagram.com/p/BBB/', code: 'BBB' },
+    ]);
+    expect(parseAddList('')).toEqual([]);
   });
 });

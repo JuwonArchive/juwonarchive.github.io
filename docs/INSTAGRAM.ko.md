@@ -36,3 +36,13 @@
 ## (참고) 완전 자동: 프로페셔널 계정
 
 프로페셔널(크리에이터) 계정으로 바꾸고 Meta 개발자 앱에서 받은 토큰을 GitHub Secret `IG_TOKEN`에 넣으면, INBOX 공유 없이 인스타에 올리기만 해도 같은 규칙으로 들어가요. 토큰은 60일마다 만료되며, `GH_SECRETS_TOKEN`(이 저장소의 Secrets 읽기/쓰기 권한 토큰)을 넣으면 매일 자동 갱신돼요.
+
+## 링크로 바로 넣기 (해시태그 없는 게시물)
+
+GitHub → Actions → Deploy → **Run workflow** → `ig_add` 칸에 `링크 => 탭 이름`을 적고 실행해요. 여러 개는 줄바꿈이나 `;`로 구분해요.
+
+```
+https://www.instagram.com/reel/XXXX/ => AI GENERATED
+```
+
+탭 이름 없이 링크만 넣으면 해시태그 규칙을 따라요. 이미 아카이브에 있는 게시물은 다시 넣지 않아요.

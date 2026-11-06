@@ -100,3 +100,19 @@ export function postUrlsIn(tree: unknown): Map<string, string> {
   }
   return out;
 }
+
+/**
+ * Posts handed in directly ("Run workflow" → ig_add): one per line or ';', each "URL" or "URL => TAB".
+ * Without a tab, the hashtags decide as usual.
+ */
+export function parseAddList(text = ''): { url: string; code: string; title?: string }[] {
+  const out: { url: string; code: string; title?: string }[] = [];
+  for (const entry of text.split(/[;\n]+/)) {
+    const [left, right] = entry.split('=>').map((x) => x.trim());
+    const found = [...postUrlsIn([left ?? ''])][0];
+    if (!found) continue;
+    const [code, url] = found;
+    out.push(right ? { url, code, title: right.toUpperCase() } : { url, code });
+  }
+  return out;
+}

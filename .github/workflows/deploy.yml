@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch: # "Run workflow" button = update now
+    inputs:
+      ig_add:
+        description: 'Instagram posts to add: "URL => TAB" (one per line or ;). Without a tab the hashtags decide.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -38,6 +43,7 @@ jobs:
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          IG_ADD: ${{ inputs.ig_add }}
 
       # Instagram tokens last 60 days: renew once a day and store the new one (needs GH_SECRETS_TOKEN).
       - name: Renew Instagram token
