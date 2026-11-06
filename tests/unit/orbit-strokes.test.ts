@@ -13,6 +13,9 @@ describe('crossings (user: halftone only where lines cross)', () => {
     const p = { x: a[c[0].i - 1].x + (a[c[0].i].x - a[c[0].i - 1].x) * c[0].t, y: a[c[0].i - 1].y + (a[c[0].i].y - a[c[0].i - 1].y) * c[0].t };
     expect(p.x).toBeCloseTo(50, 5);
     expect(p.y).toBeCloseTo(50, 5);
+    // …and the same point on the other line.
+    const b = line(0, 100, 100, 0);
+    expect(b[c[0].j - 1].x + (b[c[0].j].x - b[c[0].j - 1].x) * c[0].u).toBeCloseTo(50, 5);
   });
   it('ignores shallow crossings (lines running side by side)', () => {
     expect(crossings(line(0, 0, 100, 10), line(0, 10, 100, 0), 28 * DEG)).toHaveLength(0);

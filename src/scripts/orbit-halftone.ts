@@ -11,6 +11,8 @@ type Opts = {
   dots: HTMLCanvasElement;
   lines: HTMLCanvasElement | null;
   dotColor: string;
+  /** Darker dots for the crossing bursts. */
+  burstColor?: string;
   lineColor: string;
   labels: string[];
   /** Where each labelled marker leads (same order as labels): the matching archive box. */
@@ -41,23 +43,17 @@ const REACH = Math.max(4 * REVEAL_SIGMA, 10 + RIPPLE_REACH + 3 * RIPPLE_WIDTH);
 // Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
 const BAND = 4.5;
 const PHONE_BAND = 3;
-// Crossing strokes (user: wide in the middle, pointed at both ends, only where lines cross).
-const STROKE_HALF = 95; // px of orbit on each side of the crossing
-const STROKE_HALF_PHONE = 42;
-const STROKE_WIDTH = 7; // σ at the crossing, px
-const STROKE_WIDTH_PHONE = 4;
-const STROKE_INK = 1.15;
-const MIN_CROSS_ANGLE = (28 * Math.PI) / 180;
-// A new crossing grows its stroke over this long and sends out one ripple ring (user).
-const STROKE_GROW_S = 0.6;
-const CROSS_RIPPLE_S = 1.4;
-// Thin, short rings (user: the first ones were too thick and spread too far).
-const CROSS_RIPPLE_REACH = 60;
-const CROSS_RIPPLE_REACH_PHONE = 32;
-const CROSS_RIPPLE_WIDTH = 2.5; // ring σ, px
-const CROSS_RIPPLE_WIDTH_PHONE = 2.4; // just over half the 4px grid, so the ring still draws dots
-const RIPPLE_GAP_S = 1.6;
-const MAX_CROSS_RIPPLES = 3;
+// Crossing bursts (user): when two lines meet, halftone shoots out along both lines and fades away.
+const MIN_CROSS_ANGLE = (28 * Math.PI) / 180; // shallower meetings are lines running side by side
+const BURST_S = 0.9; // whole life of a burst
+const BURST_SPREAD_S = 0.35; // time to shoot out to full length
+const BURST_REACH = 120; // px along each line, each way
+const BURST_REACH_PHONE = 55;
+const BURST_WIDTH = 4; // σ at the crossing, px
+const BURST_WIDTH_PHONE = 3.2;
+const BURST_INK = 2.2; // saturates the core so the burst reads as full dots, tapering at the tips
+const BURST_GAP_S = 1.6; // a pair of lines bursts at most this often
+const MAX_BURSTS = 3;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -77,9 +73,9 @@ function ring(r: number, ax: number, az: number, n = 160, phase = 0): V3[] {
 
 type Pt = { x: number; y: number };
 
-/** Where polyline `a` crosses polyline `b` at more than `minAngle`: segment index in `a` and position t∈[0,1). */
-export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: number }[] {
-  const out: { i: number; t: number }[] = [];
+/** Where polyline `a` crosses polyline `b` at more than `minAngle`: segment index and position in each (i,t in `a`; j,u in `b`). */
+export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: number; j: number; u: number }[] {
+  const out: { i: number; t: number; j: number; u: number }[] = [];
   const sinMin = Math.sin(minAngle);
   for (let i = 1; i < a.length; i++) {
     const p = a[i - 1];
@@ -99,7 +95,7 @@ export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: n
       if (t < 0 || t >= 1 || u < 0 || u >= 1) continue;
       // |sin| of the angle between the two segments.
       if (Math.abs(den) / (Math.hypot(rx, ry) * Math.hypot(sx, sy)) < sinMin) continue;
-      out.push({ i, t });
+      out.push({ i, t, j, u });
     }
   }
   return out;
@@ -329,66 +325,57 @@ export function mountOrbitHalftone(opts: Opts) {
     const mode = opts.mode ?? 'subtle';
     dots.dataset.mode = mode;
     const subtle = mode === 'subtle';
-    // Brush strokes (user): where an orbit crosses another orbit or a centre ellipse, a halftone stroke runs
-    // along the orbit, widest at the crossing and tapering to a point at both ends. Shallow crossings (lines
-    // running side by side) get none, so the sphere's edge stays clean.
+    // Bursts (user): the moment two lines cross, halftone shoots out along both lines from the crossing,
+    // widest there and pointed at the tips, then fades away. Nothing stays: at rest the drawing is clean.
+    // Shallow crossings (lines running side by side) never burst, so the sphere's edge stays clean.
     const phone = w < 768;
-    const half = phone ? STROKE_HALF_PHONE : STROKE_HALF;
-    const widest = phone ? STROKE_WIDTH_PHONE : STROKE_WIDTH;
+    const reach = phone ? BURST_REACH_PHONE : BURST_REACH;
+    const widest = phone ? BURST_WIDTH_PHONE : BURST_WIDTH;
     const step = PITCH * 0.7;
     const others = [...g.orbits, ...g.centre];
-    const found: { key: string; x: number; y: number; orbit: Pt[]; i: number; t: number }[] = [];
+    const found: { key: string; x: number; y: number; a: Pt[]; i: number; t: number; b: Pt[]; j: number; u: number }[] = [];
     g.orbits.forEach((orbit, oi) => {
       for (let oj = 0; oj < others.length; oj++) {
         if (oj <= oi) continue; // each orbit pair once; every orbit against both ellipses
         for (const c of crossings(orbit, others[oj], MIN_CROSS_ANGLE)) {
-          const a = orbit[c.i - 1];
-          const b = orbit[c.i];
-          found.push({ key: `${oi}-${oj}`, x: a.x + (b.x - a.x) * c.t, y: a.y + (b.y - a.y) * c.t, orbit, i: c.i, t: c.t });
+          const p0 = orbit[c.i - 1];
+          const p1 = orbit[c.i];
+          found.push({ key: `${oi}-${oj}`, x: p0.x + (p1.x - p0.x) * c.t, y: p0.y + (p1.y - p0.y) * c.t, a: orbit, i: c.i, t: c.t, b: others[oj], j: c.j, u: c.u });
         }
       }
     });
-    // New crossings (user): the stroke grows out from the crossing and a ripple spreads from it.
     const track = trackCrossings(memory, found, t);
     memory = track.memory;
-    // Calm when the sphere swings fast: a pair of lines ripples at most once per RIPPLE_GAP_S, and at most
-    // MAX_CROSS_RIPPLES rings run at once.
-    let ripples = 0;
+    // Calm when the sphere swings fast: a pair of lines bursts at most once per BURST_GAP_S, and at most
+    // MAX_BURSTS run at once.
+    let bursts = 0;
     found.forEach((c, n) => {
       const age = opts.reducedMotion ? Infinity : t - track.now[n].born;
       if (age === 0) {
-        // Every new crossing grows its stroke; only some send a ring.
         const last = lastRipple.get(c.key) ?? -Infinity;
-        if (t - last >= RIPPLE_GAP_S) {
+        if (t - last >= BURST_GAP_S) {
           lastRipple.set(c.key, t);
           track.now[n].ring = true;
         }
       }
-      const g01 = Math.min(1, age / STROKE_GROW_S);
-      const grow = 1 - (1 - g01) ** 3; // ease out
-      if (grow > 0.02) {
-        for (const p of strokeSamples(c.orbit, c.i, c.t, half * grow, step)) {
-          const radius = widest * (0.18 + 0.82 * p.w) * (0.5 + 0.5 * grow);
-          // Peak ink ≈ p.w for a line of splats `step` apart with σ = radius.
-          splat(p.x, p.y, ((p.w * step) / (radius * Math.sqrt(2 * Math.PI))) * STROKE_INK * grow, radius);
-        }
-      }
-      if (age < CROSS_RIPPLE_S && track.now[n].ring && ripples < MAX_CROSS_RIPPLES) {
-        ripples++;
-        const k = age / CROSS_RIPPLE_S;
-        const r = 6 + k * (phone ? CROSS_RIPPLE_REACH_PHONE : CROSS_RIPPLE_REACH);
-        const sigma = phone ? CROSS_RIPPLE_WIDTH_PHONE : CROSS_RIPPLE_WIDTH;
-        const amp = 0.85 * (1 - k) ** 1.4;
-        const count = Math.max(12, Math.ceil((2 * Math.PI * r) / step));
-        const amount = ((amp * ((2 * Math.PI * r) / count)) / (sigma * Math.sqrt(2 * Math.PI)));
-        for (let j = 0; j < count; j++) {
-          const th = (j / count) * TAU;
-          splat(c.x + Math.cos(th) * r, c.y + Math.sin(th) * r, amount, sigma);
+      if (!(age < BURST_S) || !track.now[n].ring || bursts >= MAX_BURSTS) return;
+      bursts++;
+      if (age < 0.05) dots.dataset.lastBurst = `${Math.round(c.x)},${Math.round(c.y)}`;
+      // Shoots out fast (ease-out over BURST_SPREAD_S), then fades over the rest of BURST_S.
+      const spread = 1 - (1 - Math.min(1, age / BURST_SPREAD_S)) ** 3;
+      const fadeOut = (1 - age / BURST_S) ** 1.5;
+      const len = reach * spread;
+      if (len < step) return;
+      for (const [line, k, f] of [[c.a, c.i, c.t], [c.b, c.j, c.u]] as const) {
+        for (const p of strokeSamples(line, k, f, len, step)) {
+          const radius = widest * (0.2 + 0.8 * p.w);
+          // Peak ink ≈ p.w × fadeOut for a line of splats `step` apart with σ = radius.
+          splat(p.x, p.y, ((p.w * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * fadeOut, radius);
         }
       }
     });
-    dots.dataset.strokes = String(found.length);
-    dots.dataset.crossRipples = String(ripples);
+    dots.dataset.crossings = String(found.length);
+    dots.dataset.bursts = String(bursts);
     // Pointer: a soft swell under the cursor ('full' mode only).
     if (ptr.on > 0.01 && mode === 'full') splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
@@ -411,6 +398,8 @@ export function mountOrbitHalftone(opts: Opts) {
         const k = yy * cols + xx;
         let a = Math.min(1, field[k]);
         if (mode === 'none') continue;
+        // Burst ink is drawn darker than the hover halftone so a short burst still reads (user: 팍 퍼지고).
+        const burst = a;
         if (subtle) {
           const base = a * 0.75;
           a = base;
@@ -436,14 +425,18 @@ export function mountOrbitHalftone(opts: Opts) {
         // Fade (user): further from a stroke's middle the dots get lighter as well as smaller.
         const aq = Math.round((0.12 + 0.88 * Math.pow(a, 1.1)) * fade * fade * (3 - 2 * fade) * 12); // 12 alpha steps
         if (!aq) continue;
-        const key = rq * 16 + aq;
+        // Bit 0: burst colour when the burst carries most of this dot's ink.
+        const dark = burst * 0.75 >= a * 0.5 && burst > 0.05 ? 1 : 0;
+        const key = (rq * 16 + aq) * 2 + dark;
         let list = buckets.get(key);
         if (!list) buckets.set(key, (list = []));
         list.push(xx * PITCH + PITCH / 2, yy * PITCH + PITCH / 2);
       }
     const sizes = new Set<number>();
-    for (const [key, list] of buckets) {
+    for (const [packed, list] of buckets) {
+      const key = packed >> 1;
       sizes.add(key >> 4);
+      dctx.fillStyle = packed & 1 ? (opts.burstColor ?? opts.dotColor) : opts.dotColor;
       dctx.globalAlpha = (key & 15) / 12;
       const r = (key >> 4) / 4;
       const path = new Path2D();
@@ -458,7 +451,7 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);
-    dots.dataset.ink = 'strokes';
+    dots.dataset.ink = 'bursts';
     dots.dataset.ripple = String(RIPPLE_PERIOD);
     dots.dataset.idle = String(IDLE_MS);
     dots.dataset.hover = ptr.on.toFixed(2);

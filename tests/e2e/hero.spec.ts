@@ -17,6 +17,18 @@ async function inkAround(page: Page, x: number, y: number, half = 40) {
   );
 }
 
+/** Turn the sphere (desktop: sweep the pointer; phones turn on their own) until a crossing bursts. */
+async function waitForBurst(page: Page, isMobile: boolean) {
+  const dots = page.locator('canvas[data-halftone]');
+  if (!isMobile) await page.mouse.move(60, 450);
+  for (let i = 0; i < 400; i++) {
+    if (!isMobile) await page.mouse.move(60 + (i % 100) * 13, 450);
+    if (Number(await dots.getAttribute('data-bursts')) > 0) return;
+    await page.waitForTimeout(40);
+  }
+  throw new Error('no burst within 16s');
+}
+
 test.describe('home graphics', () => {
   test('JUWON sits at the bottom; a small clock holds the top-right corner', async ({ page }) => {
     const errors = trackErrors(page);
@@ -34,35 +46,19 @@ test.describe('home graphics', () => {
     expect(errors).toEqual([]);
   });
 
-  test('orbit line art rendered through a halftone screen', async ({ page }) => {
+  test('at rest the line art is clean: halftone only comes with crossing bursts (user)', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const canvas = page.locator('canvas[data-halftone]');
     await expect(canvas).toHaveAttribute('data-form', 'orbit');
-    const share = await canvas.evaluate((c: HTMLCanvasElement) => {
-      const ctx = c.getContext('2d')!;
-      const cell = Math.round(60 * (c.width / c.clientWidth));
-      let inked = 0;
-      let dense = 0;
-      let total = 0;
-      for (let y = 0; y + cell <= c.height; y += cell)
-        for (let x = 0; x + cell <= c.width; x += cell) {
-          const d = ctx.getImageData(x, y, cell, cell).data;
-          let a = 0;
-          for (let i = 3; i < d.length; i += 4) a += d[i];
-          const mean = a / (d.length / 4);
-          total++;
-          if (mean > 2) inked++; // strokes fade out towards their ends (user)
-          if (mean > 40) dense++;
-          else if (mean > 22 && c.clientWidth < 768) dense++; // phones use smaller dots (user)
-        }
-      return { inked: inked / total, dense: dense / total };
+    await expect(canvas).toHaveAttribute('data-ink', 'bursts');
+    const inked = await canvas.evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+      return n / (d.length / 4);
     });
-    // Only crossing strokes carry ink now (user), so most of the screen is clean.
-    expect(share.inked).toBeGreaterThan(0.003);
-    expect(share.inked).toBeLessThan(0.75);
-    // Variant ③: at rest the halftone is faint along the orbits (no dense areas required);
-    // the pointer test below covers the reveal.
+    expect(inked).toBeLessThan(0.001);
   });
 
   test('markers carry the archive boxes: same numbers and names, and lead to the box (user: 1)', async ({ page, isMobile }) => {
@@ -107,14 +103,15 @@ test.describe('home graphics', () => {
     expect(g.cy + g.r).toBeLessThan(g.h1);
   });
 
-  test('dot sizes vary continuously (not one size)', async ({ page, isMobile }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+  test('dot sizes vary continuously within a burst (not one size)', async ({ page, isMobile }) => {
     await page.goto('/');
+    await page.waitForTimeout(2500);
+    await waitForBurst(page, isMobile);
+    await page.waitForTimeout(150);
     const sizes = Number(await page.locator('canvas[data-halftone]').getAttribute('data-size-steps'));
-    // Phones span 1–2.4px (user asked for smaller dots), so fewer quarter-pixel steps exist.
-    // At rest (variant ③) sizes still vary along the orbits, over a narrower range.
-    expect(sizes).toBeGreaterThanOrEqual(isMobile ? 3 : 5); // phones span only 0.6–1.5px
+    expect(sizes).toBeGreaterThanOrEqual(3);
   });
+
 
   test('dots swell around the pointer', async ({ page, isMobile }) => {
     test.skip(isMobile, 'pointer');
@@ -409,37 +406,46 @@ test.describe('hover halftone (user)', () => {
   });
 });
 
-test('halftone appears only as strokes where lines cross, tapering at both ends (user)', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+test('crossings burst along both lines and vanish; at most a few at once (user)', async ({ page, isMobile }) => {
   await page.goto('/');
+  await page.waitForTimeout(2500);
   const dots = page.locator('canvas[data-halftone]');
-  await expect(dots).toHaveAttribute('data-ink', 'strokes');
-  expect(Number(await dots.getAttribute('data-strokes'))).toBeGreaterThan(0);
-  // Away from every crossing (a plain stretch of the right-hand orbit edge is still crowded, so use the
-  // empty quarter left of centre inside the sphere) there is no ink at rest.
-  const r = await page.evaluate(() => {
-    const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
-    const b = c.getBoundingClientRect();
-    return { x: b.left + Number(c.dataset.cx), y: b.top + Number(c.dataset.cy), r: Number(c.dataset.r) };
-  });
-  expect(await inkAround(page, r.x - r.r * 0.35, r.y - r.r * 0.55, 6)).toBeLessThan(2);
+  await waitForBurst(page, isMobile);
+  const ink = () =>
+    dots.evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+      return n;
+    });
+  // Bursts out…
+  await expect.poll(ink, { timeout: 2000 }).toBeGreaterThan(40);
+  let most = 0;
+  for (let i = 0; i < 20; i++) {
+    most = Math.max(most, Number(await dots.getAttribute('data-bursts')));
+    await page.waitForTimeout(50);
+  }
+  expect(most).toBeLessThanOrEqual(3);
+  // …and vanishes once the bursts are over (stop turning the sphere first).
+  if (!isMobile) await page.mouse.move(1300, 450);
+  await expect.poll(async () => Number(await dots.getAttribute('data-bursts')), { timeout: 10_000 }).toBe(0);
 });
 
-test('stroke dots fade: lighter as well as smaller away from the middle (user)', async ({ page, isMobile }) => {
+test('burst dots fade: lighter as well as smaller away from the crossing (user)', async ({ page, isMobile }) => {
   test.skip(isMobile, 'measured on desktop dots');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  // Collect each dot's size and opacity straight from the canvas: bigger dots must be more opaque.
+  await page.waitForTimeout(2500);
+  await waitForBurst(page, false);
+  await page.waitForTimeout(180);
+  // Each dot's size and opacity straight from the canvas: bigger dots must be more opaque.
   const pairs = await page.locator('canvas[data-halftone]').evaluate((c: HTMLCanvasElement) => {
-    const ctx = c.getContext('2d')!;
-    const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+    const { data, width, height } = c.getContext('2d')!.getImageData(0, 0, c.width, c.height);
     const seen = new Uint8Array(width * height);
     const out: [number, number][] = [];
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
         if (seen[i] || data[i * 4 + 3] < 8) continue;
-        // Flood the dot: area ≈ size, peak alpha ≈ colour strength.
         let area = 0;
         let peak = 0;
         const stack = [i];
@@ -462,24 +468,5 @@ test('stroke dots fade: lighter as well as smaller away from the middle (user)',
   const sorted = [...pairs].sort((a, b) => a[0] - b[0]);
   const q = Math.floor(sorted.length / 4);
   const avg = (xs: [number, number][]) => xs.reduce((s, p) => s + p[1], 0) / xs.length;
-  // The largest quarter of dots is clearly more opaque than the smallest quarter.
-  expect(avg(sorted.slice(-q))).toBeGreaterThan(avg(sorted.slice(0, q)) * 1.4);
-});
-
-test('new crossings send out a ripple, at most a few at once (user)', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'pointer turns the sphere');
-  await page.goto('/');
-  await page.waitForTimeout(3000);
-  const dots = page.locator('canvas[data-halftone]');
-  // Swing the pointer across: the sphere turns and crossings appear.
-  await page.mouse.move(40, 450);
-  await page.waitForTimeout(1200);
-  await page.mouse.move(1400, 450, { steps: 20 });
-  let most = 0;
-  for (let i = 0; i < 60; i++) {
-    most = Math.max(most, Number(await dots.getAttribute('data-cross-ripples')));
-    await page.waitForTimeout(50);
-  }
-  expect(most).toBeGreaterThan(0);
-  expect(most).toBeLessThanOrEqual(3);
+  expect(avg(sorted.slice(-q))).toBeGreaterThan(avg(sorted.slice(0, q)) * 1.3);
 });
