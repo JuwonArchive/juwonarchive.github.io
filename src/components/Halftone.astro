@@ -10,6 +10,16 @@ const markers = loadSite().works.map((w, i) => ({
 
 <canvas class="halftone" data-halftone aria-hidden="true"></canvas>
 <canvas class="trace" data-trace data-markers={JSON.stringify(markers)} aria-hidden="true"></canvas>
+<!-- Desktop (user): live readout of the drawing, lab-instrument style. Decorative, so hidden from assistive tech. -->
+<dl class="readout mono" data-readout aria-hidden="true">
+  <div><dt>ORBIT 01</dt><dd data-ro="o0">—</dd></div>
+  <div><dt>ORBIT 02</dt><dd data-ro="o1">—</dd></div>
+  <div><dt>ORBIT 03</dt><dd data-ro="o2">—</dd></div>
+  <div class="gap"><dt>CROSSINGS</dt><dd data-ro="crossings">—</dd></div>
+  <div><dt>WAVES</dt><dd data-ro="waves">—</dd></div>
+  <div><dt>LAST WAVE</dt><dd data-ro="last">—</dd></div>
+  <div class="gap"><dt>VIEW</dt><dd data-ro="view">—</dd></div>
+</dl>
 
 <script>
   import { mountOrbitHalftone } from '../scripts/orbit-halftone';
@@ -34,6 +44,33 @@ const markers = loadSite().works.map((w, i) => ({
   }
 </script>
 
+<script>
+  // Fill the readout from the artwork's live state, a few times a second.
+  const ro = document.querySelector<HTMLElement>('[data-readout]');
+  const src = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
+  if (ro && src && matchMedia('(min-width: 768px)').matches) {
+    const set = (k: string, v: string) => {
+      const el = ro.querySelector<HTMLElement>(`[data-ro="${k}"]`);
+      if (el && el.textContent !== v) el.textContent = v;
+    };
+    const fmt = (n: number) => (n >= 0 ? ' ' : '−') + Math.abs(n).toFixed(2);
+    const update = () => {
+      const d = src.dataset;
+      (d.orbitDrift ?? '').split(' ').forEach((o, i) => {
+        const [tilt, spin] = o.split('/').map(Number);
+        if (Number.isFinite(tilt)) set(`o${i}`, `TILT${fmt(tilt)}  SPIN${fmt(((spin % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI))}`);
+      });
+      set('crossings', String(d.crossings ?? 0).padStart(2, '0'));
+      set('waves', String(d.bursts ?? 0).padStart(2, '0'));
+      set('last', d.lastStrength ? `S ${Number(d.lastStrength).toFixed(2)}` : '—');
+      const [yaw] = (d.pose ?? '0,0').split(',').map(Number);
+      set('view', `YAW${fmt(yaw)}  PITCH${fmt(Number(d.tilt ?? 0))}`);
+    };
+    update();
+    setInterval(update, 200);
+  }
+</script>
+
 <style>
   .halftone,
   .trace {
@@ -49,5 +86,39 @@ const markers = loadSite().works.map((w, i) => ({
   .trace {
     z-index: 1;
     opacity: 0.9;
+  }
+  /* Live readout, right of the sphere: tiny muted mono, desktop only. */
+  .readout {
+    position: absolute;
+    z-index: 2;
+    right: var(--gutter);
+    bottom: calc(50% + 24px); /* sits above the horizontal axis line */
+    margin: 0;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.9;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .readout div {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .readout .gap {
+    margin-top: 10px;
+  }
+  .readout dt {
+    margin: 0;
+  }
+  .readout dd {
+    margin: 0;
+    color: var(--ink);
+    white-space: pre;
+  }
+  @media (max-width: 767px) {
+    .readout {
+      display: none;
+    }
   }
 </style>

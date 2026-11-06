@@ -171,6 +171,20 @@ export function waveStrength(o: { sin: number; z: number; neighbours: number; mi
   return Math.min(1.3, base * (o.neighbours > 0 ? 1.45 : 1) + (o.neighbours > 0 ? 0.15 : 0));
 }
 
+/**
+ * Where marker i of n sits on its orbit (0…1) at time t. Markers share the three orbits in turn (i % 3); those on
+ * the same orbit are spread evenly around it and move at the orbit's speed, so they never travel bunched up
+ * (user). Each orbit starts at its own offset, and the middle orbit runs the other way.
+ */
+export function markerPhaseOf(i: number, n: number, t: number): number {
+  const orbit = i % 3;
+  const k = Math.floor(i / 3);
+  const onOrbit = Math.ceil((n - orbit) / 3);
+  const speed = 0.025 * (1 + orbit * 0.3) * (orbit === 1 ? -1 : 1);
+  const p = [0, 0.37, 0.71][orbit] + k / Math.max(1, onOrbit) + t * speed;
+  return ((p % 1) + 1) % 1;
+}
+
 export type TrackedCrossing = { key: string; x: number; y: number; born: number; seen: number };
 
 /**
@@ -331,7 +345,7 @@ export function mountOrbitHalftone(opts: Opts) {
   );
 
   // Where marker i sits on its orbit at time t (shared by the halftone and the line layer).
-  const markerPhase = (i: number, t: number) => ((i * 0.27 + t * 0.025 * (1 + (i % 3) * 0.3)) % 1 + 1) % 1;
+  const markerPhase = (i: number, t: number) => markerPhaseOf(i, opts.labels.length, t);
   const markerAt = (g: { orbits: { x: number; y: number }[][] }, i: number, t: number) => {
     const orbit = g.orbits[i % g.orbits.length];
     return orbit[Math.floor(markerPhase(i, t) * (orbit.length - 1))];
@@ -580,6 +594,61 @@ export function mountOrbitHalftone(opts: Opts) {
         lctx.moveTo(g.cx + dx * (g.R + 6), g.cy + dy * (g.R + 6));
         lctx.lineTo(g.cx + dx * (g.R + 18), g.cy + dy * (g.R + 18));
         lctx.stroke();
+      }
+      // Desktop (user): the axes run on towards the screen edges like a technical drawing — dotted, with a
+      // tick every 40px (longer every 200px) and a small label at each end — so the white reads as layout.
+      if (w >= 768) {
+        const m = 32; // stay clear of the corner text
+        const x0 = m, x1 = w - m, y0 = 72, y1 = h - 72;
+        lctx.save();
+        lctx.globalAlpha = 0.45;
+        lctx.lineWidth = 0.7;
+        lctx.setLineDash([1, 5]);
+        lctx.beginPath();
+        lctx.moveTo(x0, g.cy);
+        lctx.lineTo(g.cx - g.R - 22, g.cy);
+        lctx.moveTo(g.cx + g.R + 22, g.cy);
+        lctx.lineTo(x1, g.cy);
+        lctx.moveTo(g.cx, y0);
+        lctx.lineTo(g.cx, g.cy - g.R - 22);
+        lctx.moveTo(g.cx, g.cy + g.R + 22);
+        lctx.lineTo(g.cx, y1);
+        lctx.stroke();
+        lctx.setLineDash([]);
+        const tick = (x: number, y: number, horizontal: boolean, long: boolean) => {
+          const l = long ? 6 : 3;
+          lctx.beginPath();
+          if (horizontal) {
+            lctx.moveTo(x, y - l);
+            lctx.lineTo(x, y + l);
+          } else {
+            lctx.moveTo(x - l, y);
+            lctx.lineTo(x + l, y);
+          }
+          lctx.stroke();
+        };
+        for (let d = 40; g.cx - d >= x0 || g.cx + d <= x1; d += 40) {
+          if (d <= g.R + 22) continue;
+          if (g.cx - d >= x0) tick(g.cx - d, g.cy, true, d % 200 === 0);
+          if (g.cx + d <= x1) tick(g.cx + d, g.cy, true, d % 200 === 0);
+        }
+        for (let d = 40; g.cy - d >= y0 || g.cy + d <= y1; d += 40) {
+          if (d <= g.R + 22) continue;
+          if (g.cy - d >= y0) tick(g.cx, g.cy - d, false, d % 200 === 0);
+          if (g.cy + d <= y1) tick(g.cx, g.cy + d, false, d % 200 === 0);
+        }
+        lctx.globalAlpha = 0.6;
+        lctx.font = '9px "Geist Mono Variable", ui-monospace, monospace';
+        lctx.textBaseline = 'middle';
+        lctx.textAlign = 'left';
+        lctx.fillText('X−', x0, g.cy - 12);
+        lctx.textAlign = 'right';
+        lctx.fillText('X+', x1, g.cy - 12);
+        lctx.textAlign = 'left';
+        lctx.fillText('Y+', g.cx + 8, y0);
+        lctx.fillText('Y−', g.cx + 8, y1);
+        lctx.restore();
+        lines.dataset.axes = 'extended';
       }
       // Crosshair and nucleus.
       lctx.beginPath();

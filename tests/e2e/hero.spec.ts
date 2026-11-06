@@ -219,6 +219,32 @@ test.describe('home graphics', () => {
     expect(new Set(moved.map((m) => m.toFixed(3))).size).toBe(3); // …each at its own pace
   });
 
+  test('desktop: axes run on to the edges and a live readout fills the right side; phones keep it clean (user)', async ({ page, isMobile }) => {
+    await page.goto('/');
+    await page.waitForTimeout(1500);
+    const readout = page.locator('[data-readout]');
+    if (isMobile) {
+      await expect(readout).toBeHidden();
+      await expect(page.locator('canvas[data-trace]')).not.toHaveAttribute('data-axes', 'extended');
+      return;
+    }
+    await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-axes', 'extended');
+    await expect(readout).toBeVisible();
+    // Live: the orbit values change as the orbits drift.
+    const first = await readout.locator('[data-ro="o0"]').textContent();
+    expect(first).toMatch(/TILT\s?−?\d\.\d\d\s+SPIN/);
+    await expect.poll(() => readout.locator('[data-ro="o0"]').textContent(), { timeout: 6000 }).not.toBe(first);
+    // It sits right of the sphere, clear of it and above the horizontal axis.
+    const box = (await readout.boundingBox())!;
+    const g = await page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+      const b = c.getBoundingClientRect();
+      return { right: b.left + Number(c.dataset.cx) + Number(c.dataset.r), axis: b.top + Number(c.dataset.cy) };
+    });
+    expect(box.x).toBeGreaterThan(g.right + 40);
+    expect(box.y + box.height).toBeLessThan(g.axis);
+  });
+
   test('no background fog: plain white page', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('[data-fog]')).toHaveCount(0);
