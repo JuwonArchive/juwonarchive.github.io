@@ -30,6 +30,30 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # New Instagram posts go to the matching Notion archive by hashtag (docs/INSTAGRAM.ko.md).
+      # Off until the IG_TOKEN secret exists; never blocks the site update.
+      - name: Instagram → Notion
+        continue-on-error: true
+        run: npx tsx scripts/ig-to-notion.ts
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+
+      # Instagram tokens last 60 days: renew once a day and store the new one (needs GH_SECRETS_TOKEN).
+      - name: Renew Instagram token
+        if: github.event_name != 'push'
+        continue-on-error: true
+        run: |
+          if [ -z "$IG_TOKEN" ] || [ -z "$GH_TOKEN" ]; then echo "Token renewal is off."; exit 0; fi
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%H)" != "03" ]; then echo "Renews daily at 03 UTC."; exit 0; fi
+          npx tsx scripts/ig-to-notion.ts --refresh
+          gh secret set IG_TOKEN --repo "$GITHUB_REPOSITORY" < "$IG_TOKEN_OUT"
+          rm -f "$IG_TOKEN_OUT"
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_SECRETS_TOKEN }}
+          IG_TOKEN_OUT: ${{ runner.temp }}/ig_token
+
       - name: Check whether Notion changed
         id: check
         if: github.event_name == 'schedule'
