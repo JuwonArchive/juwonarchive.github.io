@@ -58,6 +58,8 @@ const site = loadSite();
     justify-content: flex-end;
     padding: var(--gutter);
     overflow: hidden;
+    /* The home does not scroll: a finger drag turns the sphere instead (user). */
+    touch-action: none;
   }
   /* Halftone behind the name. */
   .hero-slot {

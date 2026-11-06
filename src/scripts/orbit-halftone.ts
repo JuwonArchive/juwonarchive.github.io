@@ -37,6 +37,13 @@ const RIPPLE_PERIOD = 1.6;
 const RIPPLE_REACH = 120; // px the ring travels
 const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
 // The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
+// Sphere tilt in radians (positive looks from below): resting, pointer at the top, pointer at the bottom.
+const BASE_TILT = 0.32;
+const TILT_TOP = -0.6;
+const TILT_BOTTOM = 0.75;
+// Touch drag: a full screen width turns the sphere this much (rad); a full screen height tilts it this much.
+const DRAG_YAW = 3.2;
+const DRAG_TILT = 2.4;
 const IDLE_MS = 3000; // 3s of rest before the hover halftone fades (user)
 // Beyond this distance neither the spot (4σ) nor the ripple ring reaches.
 const REACH = Math.max(4 * REVEAL_SIGMA, 10 + RIPPLE_REACH + 3 * RIPPLE_WIDTH);
@@ -253,7 +260,7 @@ export function mountOrbitHalftone(opts: Opts) {
     const cx = w * 0.5;
     const cy = band ? (band.top + band.bottom) / 2 : h * 0.5;
     const yaw = pose.yaw + t * 0.08;
-    const pitch = 0.32 + pose.pitch;
+    const pitch = BASE_TILT + pose.pitch;
     const [cy_, sy_, cp, sp] = [Math.cos(yaw), Math.sin(yaw), Math.cos(pitch), Math.sin(pitch)];
     const project = ([x, y, z]: V3) => {
       [x, z] = [x * cy_ + z * sy_, -x * sy_ + z * cy_];
@@ -297,8 +304,13 @@ export function mountOrbitHalftone(opts: Opts) {
     return hits.find((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
   };
   const interactive = (el: EventTarget | null) => el instanceof Element && el.closest('a, button, input, [data-home-nav]');
+  let dragMoved = false; // a touch drag that turned the sphere is not a tap on a marker
   window.addEventListener('click', (e) => {
     if (e.button !== 0 || interactive(e.target)) return;
+    if (dragMoved) {
+      dragMoved = false;
+      return;
+    }
     const hit = hitAt(e.clientX, e.clientY);
     if (hit) window.location.href = hit.href;
   });
@@ -628,6 +640,7 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.cy = String(Math.round(g.cy));
     dots.dataset.r = String(Math.round(g.R));
     dots.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
+    dots.dataset.tilt = (BASE_TILT + pose.pitch).toFixed(2);
   };
 
   resize();
@@ -645,11 +658,39 @@ export function mountOrbitHalftone(opts: Opts) {
     return;
   }
 
+  // Touch (user): drag to turn the sphere — sideways turns it, up/down tilts it to show the top or bottom.
+  // It stays where it was left and keeps its slow spin.
+  let drag: { x: number; y: number; ty: number; tp: number } | null = null;
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType !== 'touch' || interactive(e.target)) return;
+      drag = { x: e.clientX, y: e.clientY, ty: pose.ty, tp: pose.tp };
+      dragMoved = false;
+    },
+    { passive: true },
+  );
+  const endDrag = () => (drag = null);
+  window.addEventListener('pointerup', endDrag, { passive: true });
+  window.addEventListener('pointercancel', endDrag, { passive: true });
   window.addEventListener(
     'pointermove',
     (e) => {
-      pose.ty = (e.clientX / window.innerWidth - 0.5) * 1.0;
-      pose.tp = (e.clientY / window.innerHeight - 0.5) * 0.5;
+      if (e.pointerType === 'touch') {
+        if (!drag) return;
+        const dx = e.clientX - drag.x;
+        const dy = e.clientY - drag.y;
+        if (Math.hypot(dx, dy) > 8) dragMoved = true;
+        pose.ty = drag.ty + (dx / window.innerWidth) * DRAG_YAW;
+        // Dragging down pulls the front down and shows the top (like turning a globe with a finger).
+        pose.tp = Math.max(TILT_TOP - BASE_TILT, Math.min(TILT_BOTTOM - BASE_TILT, drag.tp - (dy / window.innerHeight) * DRAG_TILT));
+      } else {
+        pose.ty = (e.clientX / window.innerWidth - 0.5) * 1.0;
+        // Up/down tilt: the resting tilt (0.32) already looks slightly from below, so the pointer must swing
+        // further up than down for the top to show as clearly as the bottom (user): top −0.6, bottom +0.75.
+        const yn = e.clientY / window.innerHeight;
+        pose.tp = yn < 0.5 ? (0.5 - yn) * 2 * (TILT_TOP - BASE_TILT) : (yn - 0.5) * 2 * (TILT_BOTTOM - BASE_TILT);
+      }
       const r = dots.getBoundingClientRect();
       ptr.tx = e.clientX - r.left;
       ptr.ty = e.clientY - r.top;

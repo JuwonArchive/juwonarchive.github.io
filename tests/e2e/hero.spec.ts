@@ -152,6 +152,57 @@ test.describe('home graphics', () => {
     expect(await snap()).not.toBe(a);
   });
 
+  test('pointer up shows the top of the sphere as clearly as pointer down shows the bottom (user)', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'pointer');
+    await page.goto('/');
+    const tilt = () => page.locator('canvas[data-halftone]').evaluate((c: HTMLCanvasElement) => Number(c.dataset.tilt));
+    const vp = page.viewportSize()!;
+    await page.mouse.move(vp.width / 2, 2, { steps: 4 });
+    await expect.poll(tilt, { timeout: 6000 }).toBeLessThan(-0.5); // looking from above
+    const top = await tilt();
+    await page.mouse.move(vp.width / 2, vp.height - 2, { steps: 4 });
+    await expect.poll(tilt, { timeout: 6000 }).toBeGreaterThan(0.65); // looking from below
+    const bottom = await tilt();
+    // About as far from edge-on (0) either way.
+    expect(Math.abs(Math.abs(top) - Math.abs(bottom))).toBeLessThan(0.25);
+  });
+
+  test('on phones a finger drag turns and tilts the sphere (user)', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'touch');
+    await page.goto('/');
+    await page.waitForTimeout(2800);
+    const dots = page.locator('canvas[data-halftone]');
+    const state = () => dots.evaluate((c: HTMLCanvasElement) => ({ tilt: Number(c.dataset.tilt), yaw: Number(c.dataset.pose!.split(',')[0]) }));
+    const drag = (x0: number, y0: number, x1: number, y1: number) =>
+      page.evaluate(
+        async ([x0, y0, x1, y1]) => {
+          const at = (type: string, x: number, y: number) =>
+            document.querySelector('main')!.dispatchEvent(new PointerEvent(type, { pointerType: 'touch', clientX: x, clientY: y, bubbles: true, isPrimary: true }));
+          at('pointerdown', x0, y0);
+          for (let i = 1; i <= 10; i++) {
+            at('pointermove', x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10);
+            await new Promise((r) => setTimeout(r, 16));
+          }
+          at('pointerup', x1, y1);
+        },
+        [x0, y0, x1, y1] as const,
+      );
+    // Drag up: tilts towards the bottom view…
+    const t0 = (await state()).tilt;
+    await drag(200, 600, 200, 250);
+    await expect.poll(async () => (await state()).tilt, { timeout: 5000 }).toBeGreaterThan(Math.min(t0 + 0.6, 0.7)); // up to the bottom-view limit
+    // …drag down: tilts towards the top view, past edge-on.
+    const t1 = (await state()).tilt;
+    await drag(200, 250, 200, 600);
+    await expect.poll(async () => (await state()).tilt, { timeout: 5000 }).toBeLessThan(Math.min(t1 - 0.6, -0.2));
+    // Drag sideways: it turns.
+    const mid = await state();
+    await drag(80, 400, 320, 400);
+    await expect.poll(async () => Math.abs((await state()).yaw - mid.yaw), { timeout: 5000 }).toBeGreaterThan(0.8);
+    // The home itself does not scroll or zoom under the finger.
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('main.home')!).touchAction)).toBe('none');
+  });
+
   test('no background fog: plain white page', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('[data-fog]')).toHaveCount(0);
