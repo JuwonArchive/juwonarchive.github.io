@@ -56,6 +56,8 @@ const BURST_INK = 1.05; // peak ink at the start ≈ full dots, so they start sh
 const BURST_GAP_S = 4; // a pair of lines bursts at most this often (user: rarer)
 const BURST_ANY_GAP_S = 2.5; // and a new wave starts at least this long after the previous one (rare)
 const MAX_BURSTS = 2;
+// Phone wave dots: up to 1.8px radius (diameter stays under the 4px grid), vs 1.3px for the hover halftone.
+const PHONE_BURST_MAX_R = 1.8;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -415,7 +417,8 @@ export function mountOrbitHalftone(opts: Opts) {
         // Burst ink is drawn darker than the hover halftone so a short burst still reads (user: 팍 퍼지고).
         const burst = a;
         if (subtle) {
-          const base = a * 0.75;
+          // Phones show the wave ink at full strength; desktop keeps it a touch lighter.
+          const base = a * (w < 768 ? 1 : 0.75);
           a = base;
           // Only cells the spot or the ripple can reach need the pointer maths (saves ~90% of a frame's work).
           const px = xx * PITCH + PITCH / 2 - ptr.x;
@@ -433,14 +436,16 @@ export function mountOrbitHalftone(opts: Opts) {
           }
         }
         if (a < 0.06) continue;
-        const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow(Math.max(0, a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
+        // Bit 0: burst colour when the burst carries most of this dot's ink.
+        const dark = burst * (w < 768 ? 1 : 0.75) >= a * 0.5 && burst > 0.05 ? 1 : 0;
+        // On phones the crossing waves may grow larger dots than the hover halftone, or they barely show (user).
+        const top = dark && w < 768 ? PHONE_BURST_MAX_R : max;
+        const rq = Math.round((MIN_R + (top - MIN_R) * Math.pow(Math.max(0, a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
         // Outermost dots fade in instead of popping on at a hard threshold (no visible ring).
         const fade = Math.min(1, (a - 0.06) / 0.2);
         // Fade (user): further from a stroke's middle the dots get lighter as well as smaller.
         const aq = Math.round((0.12 + 0.88 * Math.pow(a, 1.1)) * fade * fade * (3 - 2 * fade) * 12); // 12 alpha steps
         if (!aq) continue;
-        // Bit 0: burst colour when the burst carries most of this dot's ink.
-        const dark = burst * 0.75 >= a * 0.5 && burst > 0.05 ? 1 : 0;
         const key = (rq * 16 + aq) * 2 + dark;
         let list = buckets.get(key);
         if (!list) buckets.set(key, (list = []));
