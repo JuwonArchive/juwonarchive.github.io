@@ -99,11 +99,16 @@ describe('localizeInstagram', () => {
     expect(warnings.map((w) => w.code)).toContain('instagram-fetch');
   });
 
-  it('keeps the embed (cropped) for a video whose file Instagram withholds, instead of showing a still', async () => {
+  it('a video Instagram will not release (e.g. library music) becomes its cover with a play-on-Instagram button (user)', async () => {
     const s = site();
     s.works[0].blocks[0] = { type: 'embed', provider: 'instagram', url: 'https://www.instagram.com/reel/DDD/', embedUrl: 'https://www.instagram.com/reel/DDD/embed' };
     const out = await localizeInstagram(s, dir, warn, io());
-    expect(out.works[0].blocks[0]).toMatchObject({ type: 'embed', provider: 'instagram', aspect: expect.closeTo(0.5625, 4) });
+    expect(out.works[0].blocks[0]).toEqual({
+      type: 'image',
+      media: { id: 'ig-DDD', src: '/media/ig-DDD.webp', kind: 'image', width: 1080, height: 1350 },
+      source: 'https://www.instagram.com/reel/DDD/',
+      playOn: 'instagram',
+    });
   });
 
   it('keeps the embed when a video is too large to host', async () => {

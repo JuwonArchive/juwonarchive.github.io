@@ -75,11 +75,15 @@ export async function localizeInstagram(site: SiteData, outDir: string, warn: (w
             replaced = { type: 'video', media: { id, src: `/media/${id}.mp4`, kind: 'video', ...dims, bytes: raw.length }, source: block.url };
           }
         }
-        // A video must stay a video: only photo posts become images.
-        if (!replaced && !post.isVideo && post.imageUrl) {
+        // Photo posts become images. A video Instagram will not release (usually library music; its embed only
+        // says "Watch on Instagram") becomes its cover with a play button to the post (user). A video that is
+        // merely too large stays an embed, which still plays.
+        const withheld = post.isVideo && !post.videoUrl;
+        if (!replaced && (!post.isVideo || withheld) && post.imageUrl) {
           const img = await io.toWebp(await io.download(post.imageUrl));
           writeFileSync(join(outDir, `${id}.webp`), img.buf);
           replaced = { type: 'image', media: { id, src: `/media/${id}.webp`, kind: 'image', width: img.width, height: img.height }, source: block.url };
+          if (withheld) replaced.playOn = 'instagram';
         }
       } catch (err) {
         warn({ code: 'instagram-media', message: `Could not download ${block.url}: ${(err as Error).message}; keeping the Instagram embed.` });

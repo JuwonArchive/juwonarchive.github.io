@@ -128,6 +128,18 @@ test.describe('media at a uniform 880px width (user)', () => {
     }
   });
 
+  test('a video Instagram will not release shows its cover with a play button to the post (user)', async ({ page }) => {
+    const w = site.works.find((x) => x.blocks.some((b) => b.type === 'image' && 'playOn' in b && b.playOn));
+    test.skip(!w, 'no such posts in the current content');
+    await page.goto(`/archive/${w!.slug}`);
+    const link = page.locator('a[data-play-on="instagram"]').first();
+    await expect(link).toHaveAttribute('href', /instagram\.com\/(p|reel)\//);
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link.locator('.play-btn')).toHaveText(/PLAY ON INSTAGRAM/);
+    // The cover keeps the post's own shape and the 880px width rule.
+    expect((await link.boundingBox())!.width).toBeLessThanOrEqual(880.5);
+  });
+
   test('Instagram posts carry a button to the original post', async ({ page }) => {
     const w = site.works.find((x) => x.blocks.some((b) => ('source' in b && b.source) || (b.type === 'embed' && 'provider' in b && b.provider === 'instagram')));
     test.skip(!w, 'no Instagram posts');

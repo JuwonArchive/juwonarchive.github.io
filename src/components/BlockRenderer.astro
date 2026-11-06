@@ -62,7 +62,14 @@ const isFirstImage = () => {
             <figure class="b-media">
               <CropMarks>
                 <div class="frame" data-frame>
-                  <a class="zoom" href={b.media.src} target="_blank" rel="noopener" aria-label="Open full-size image">
+                  <a
+                    class={b.playOn ? 'zoom play' : 'zoom'}
+                    href={b.playOn && b.source ? b.source : b.media.src}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={b.playOn ? 'Play this video on Instagram' : 'Open full-size image'}
+                    data-play-on={b.playOn}
+                  >
                     <img
                       src={b.media.src}
                       width={b.media.width}
@@ -72,6 +79,11 @@ const isFirstImage = () => {
                       fetchpriority={first ? 'high' : undefined}
                       decoding="async"
                     />
+                    {b.playOn && (
+                      <span class="play-btn pill" aria-hidden="true">
+                        ▶ PLAY ON INSTAGRAM
+                      </span>
+                    )}
                   </a>
                   {b.source && <IgLink href={b.source} />}
                 </div>
@@ -269,6 +281,26 @@ const isFirstImage = () => {
   .zoom {
     display: block;
     cursor: zoom-in;
+  }
+  /* Instagram withholds the video (e.g. library music): its cover, with a play button to the post (user). */
+  .zoom.play {
+    position: relative;
+    cursor: pointer;
+  }
+  .play-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    height: 40px;
+    padding: 0 18px;
+    pointer-events: none;
+  }
+  .zoom.play:hover .play-btn,
+  .zoom.play:focus-visible .play-btn {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--white);
   }
   .frame--embed iframe {
     width: 100%;

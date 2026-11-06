@@ -7,7 +7,15 @@ export type Block =
   | { type: 'list'; ordered: boolean; items: RichText[] }
   | { type: 'quote'; text: RichText }
   | { type: 'divider' }
-  | { type: 'image'; media: Media; caption?: RichText; /** original post (e.g. Instagram) */ source?: string }
+  | {
+      type: 'image';
+      media: Media;
+      caption?: RichText;
+      /** original post (e.g. Instagram) */
+      source?: string;
+      /** The post is a video that plays only on Instagram (e.g. library music): show a play button to the post. */
+      playOn?: 'instagram';
+    }
   | { type: 'video'; media: Media; caption?: RichText; /** original post (e.g. Instagram) */ source?: string }
   | { type: 'embed'; url: string; embedUrl: string; provider: EmbedProvider; caption?: RichText; /** width / height of the post itself (Instagram) */ aspect?: number }
   | { type: 'fallback-link'; url: string; label: string };
