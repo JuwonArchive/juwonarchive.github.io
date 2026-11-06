@@ -20,7 +20,7 @@ const markers = loadSite().works.map((w, i) => ({
   <div><dt>LAST WAVE</dt><dd data-ro="last">—</dd></div>
   <div class="gap"><dt>VIEW</dt><dd data-ro="view">—</dd></div>
 </dl>
-<!-- Phones (user): the readout split across the top, under the top bar: counts left, view right. -->
+<!-- Phones (user): the readout under the site label, top left: counts, then view. -->
 <p class="readout-m mono" data-readout-m aria-hidden="true" hidden>
   <span data-rm="counts">—</span>
   <span data-rm="view">—</span>
@@ -158,9 +158,11 @@ const markers = loadSite().works.map((w, i) => ({
     left: var(--gutter);
     right: var(--gutter);
     margin: 0;
+    /* Four values are few: stacked on the left, under the site label (user). */
     display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
     color: var(--muted);
     font-size: 8.5px;
     line-height: 1.5;
