@@ -100,6 +100,11 @@ test.describe('media at a uniform 880px width (user)', () => {
         await f.scrollIntoViewIfNeeded();
         const r = await f.evaluate(async (el) => {
           const box = el.getBoundingClientRect();
+          const tiles = el.querySelector<HTMLElement>('[data-tiles]');
+          if (tiles) {
+            // A tall image in pieces: the whole stack must keep the image's shape.
+            return { w: box.width, h: box.height, aspect: Number(tiles.dataset.w) / Number(tiles.dataset.h), fit: 'contain' };
+          }
           const img = el.querySelector('img');
           const vid = el.querySelector('video');
           if (img) {
@@ -138,6 +143,23 @@ test.describe('media at a uniform 880px width (user)', () => {
     await expect(link.locator('.play-btn')).toHaveText(/PLAY ON INSTAGRAM/);
     // The cover keeps the post's own shape and the 880px width rule.
     expect((await link.boundingBox())!.width).toBeLessThanOrEqual(880.5);
+  });
+
+  test('tall images arrive in pieces that load lazily and stack without gaps (user)', async ({ page }) => {
+    const w = site.works.find((x) => x.blocks.some((b) => b.type === 'image' && !!(b as { media?: { tiles?: unknown[] } }).media?.tiles));
+    test.skip(!w, 'no tall images in the current content');
+    await page.goto(`/archive/${w!.slug}`);
+    const stack = page.locator('[data-tiles]').first();
+    const imgs = stack.locator('img');
+    expect(await imgs.count()).toBeGreaterThan(1);
+    expect(await imgs.nth(1).getAttribute('loading')).toBe('lazy');
+    await stack.scrollIntoViewIfNeeded();
+    const gaps = await stack.evaluate(async (el) => {
+      const list = [...el.querySelectorAll('img')];
+      for (const i of list) { i.loading = 'eager'; if (!i.complete) await new Promise((r) => i.addEventListener('load', r, { once: true })); }
+      return list.slice(1).map((img, k) => img.getBoundingClientRect().top - list[k].getBoundingClientRect().bottom);
+    });
+    for (const g of gaps) expect(g).toBeLessThanOrEqual(0.01);
   });
 
   test('Instagram posts carry a button to the original post', async ({ page }) => {

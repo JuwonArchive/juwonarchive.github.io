@@ -81,6 +81,57 @@ describe('localizeMedia', () => {
   });
 });
 
+describe('defaultIO.toWebpTiles (user: tall images were heavy on phones)', () => {
+  it('cuts tall images into 2400px pieces that overlap by 2px, at full width', async () => {
+    const { defaultIO, TILE_HEIGHT } = await import('../../src/lib/notion/media');
+    const sharp = (await import('sharp')).default;
+    const tall = await sharp({ create: { width: 1000, height: 8000, channels: 3, background: '#fff' } }).png().toBuffer();
+    const out = await defaultIO.toWebpTiles(tall);
+    expect(TILE_HEIGHT).toBe(2400);
+    expect(out.width).toBe(1000);
+    expect(out.height).toBe(8000);
+    expect(out.tiles.map((t) => t.height)).toEqual([2402, 2402, 2402, 800]);
+  });
+  it('keeps very long images at full width (no 16383px height limit any more)', async () => {
+    const { defaultIO } = await import('../../src/lib/notion/media');
+    const sharp = (await import('sharp')).default;
+    const long = await sharp({ create: { width: 1500, height: 20000, channels: 3, background: '#fff' } }).png().toBuffer();
+    const out = await defaultIO.toWebpTiles(long);
+    expect(out.width).toBe(1500);
+    expect(out.height).toBe(20000);
+    expect(out.tiles).toHaveLength(9);
+  });
+  it('caps width at 1760px (2× the 880px frame); short images stay one piece', async () => {
+    const { defaultIO } = await import('../../src/lib/notion/media');
+    const sharp = (await import('sharp')).default;
+    const wide = await sharp({ create: { width: 5120, height: 2880, channels: 3, background: '#fff' } }).png().toBuffer();
+    const out = await defaultIO.toWebpTiles(wide);
+    expect(out.width).toBe(1760);
+    expect(out.height).toBe(990);
+    expect(out.tiles).toHaveLength(1);
+  });
+});
+
+describe('localizeMedia tiles', () => {
+  it('saves each piece and records them on the image', async () => {
+    const tiled = {
+      ...io(),
+      async toWebpTiles() {
+        return { width: 1760, height: 5000, tiles: [{ buf: Buffer.from('a'), height: 2402 }, { buf: Buffer.from('b'), height: 2402 }, { buf: Buffer.from('c'), height: 200 }] };
+      },
+    };
+    const out = await localizeMedia(site([{ type: 'image', media: { id: 'long', src: 'https://x/long.png', kind: 'image' } }]), dir, warn, tiled);
+    expect(out.works[0].blocks[0]).toEqual({
+      type: 'image',
+      media: {
+        id: 'long', kind: 'image', src: '/media/long-1.webp', width: 1760, height: 5000,
+        tiles: [{ src: '/media/long-1.webp', height: 2402 }, { src: '/media/long-2.webp', height: 2402 }, { src: '/media/long-3.webp', height: 200 }],
+      },
+    });
+    expect(readdirSync(dir).sort()).toEqual(['long-1.webp', 'long-2.webp', 'long-3.webp']);
+  });
+});
+
 describe('defaultIO.toWebp', () => {
   it('keeps tall images (detail pages) at full width instead of shrinking by the long edge', async () => {
     const { defaultIO } = await import('../../src/lib/notion/media');
@@ -90,12 +141,12 @@ describe('defaultIO.toWebp', () => {
     expect(out.width).toBe(1000);
     expect(out.height).toBe(8000);
   });
-  it('caps very wide images at 2560px wide', async () => {
+  it('caps very wide images at 1760px wide (2× the 880px frame)', async () => {
     const { defaultIO } = await import('../../src/lib/notion/media');
     const sharp = (await import('sharp')).default;
     const wide = await sharp({ create: { width: 5120, height: 2880, channels: 3, background: '#fff' } }).png().toBuffer();
     const out = await defaultIO.toWebp(wide);
-    expect(out.width).toBe(2560);
-    expect(out.height).toBe(1440);
+    expect(out.width).toBe(1760);
+    expect(out.height).toBe(990);
   });
 });

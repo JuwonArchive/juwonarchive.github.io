@@ -58,6 +58,37 @@ const isFirstImage = () => {
           return <hr class="b-divider" />;
         case 'image': {
           const first = isFirstImage();
+          const tiles = b.media.tiles;
+          if (tiles && b.media.width && b.media.height) {
+            // A tall image in pieces: stacked edge to edge, each loading only as it nears the screen.
+            const overlap = `${((2 / b.media.width) * 100).toFixed(4)}%`;
+            return (
+              <figure class="b-media">
+                <CropMarks>
+                  <div class="frame" data-frame>
+                    <div class="tiles" data-tiles data-w={b.media.width} data-h={b.media.height} style={`--tile-overlap:${overlap}`}>
+                      {tiles.map((t, i) => (
+                        <img
+                          src={t.src}
+                          width={b.media.width}
+                          height={t.height}
+                          alt={i === 0 && b.caption ? b.caption.map((s) => s.text).join('') : ''}
+                          loading={first && i === 0 ? 'eager' : 'lazy'}
+                          decoding="async"
+                        />
+                      ))}
+                    </div>
+                    {b.source && <IgLink href={b.source} />}
+                  </div>
+                </CropMarks>
+                {b.caption && (
+                  <figcaption class="mono">
+                    <RichText text={b.caption} />
+                  </figcaption>
+                )}
+              </figure>
+            );
+          }
           return (
             <figure class="b-media">
               <CropMarks>
@@ -281,6 +312,10 @@ const isFirstImage = () => {
   .zoom {
     display: block;
     cursor: zoom-in;
+  }
+  /* Pieces of a tall image overlap by 2 source px (hidden by the negative margin) so no seam shows. */
+  .tiles img + img {
+    margin-top: calc(-1 * var(--tile-overlap));
   }
   /* Instagram withholds the video (e.g. library music): its cover, with a play button to the post (user). */
   .zoom.play {

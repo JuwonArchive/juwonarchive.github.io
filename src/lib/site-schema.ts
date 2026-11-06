@@ -1,5 +1,14 @@
 export type RichText = { text: string; href?: string; bold?: boolean; italic?: boolean; code?: boolean }[];
-export type Media = { id: string; src: string; kind: 'image' | 'video'; width?: number; height?: number; bytes?: number };
+export type Media = {
+  id: string;
+  src: string;
+  kind: 'image' | 'video';
+  width?: number;
+  height?: number;
+  bytes?: number;
+  /** A tall image cut into pieces (top to bottom); `src` is the first piece. */
+  tiles?: { src: string; height: number }[];
+};
 export type EmbedProvider = 'youtube' | 'vimeo' | 'instagram' | 'other';
 export type Block =
   | { type: 'heading'; level: 1 | 2 | 3; text: RichText }

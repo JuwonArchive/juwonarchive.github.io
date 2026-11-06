@@ -195,3 +195,4 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - Archive boxes: the card takes the cover's own shape (largest that fits), so covers are never cropped.
 - Instagram carousels: every slide is shown in order (videos, images, or play-on-Instagram covers).
 - Performance (2026-11-06): Notion videos over 3 MB are re-encoded at sync (H.264, ≤1600px, CRF 27, fast start; 39 MB → 8 MB). The home halftone does pointer maths only within reach of the spot/ripple (43 → 58 fps at 4× CPU slowdown).
+- Images: ≤1760px wide (2× the 880px frame). Images taller than 2400px are cut into 2400px pieces (2px overlap hidden by a negative margin), each lazy-loaded, so long detail pages stay light on phones.
