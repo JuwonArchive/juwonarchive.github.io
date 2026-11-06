@@ -45,7 +45,7 @@ const BAND = 4.5;
 const PHONE_BAND = 3;
 // Crossing bursts (user): when two lines meet, halftone shoots out along both lines and fades away.
 const MIN_CROSS_ANGLE = (28 * Math.PI) / 180; // shallower meetings are lines running side by side
-const BURST_S = 1.0; // whole life of a burst (the wave reaches its end as it fades out)
+const BURST_S = 1.8; // whole life of a burst: a slow spread (user), reaching its end as it fades out
 const BURST_BAND = 14; // length of the travelling wave band along the line (σ, px)
 const BURST_BAND_PHONE = 7;
 const BURST_REACH = 120; // px along each line, each way
@@ -53,8 +53,9 @@ const BURST_REACH_PHONE = 55;
 const BURST_WIDTH = 4; // σ at the crossing, px
 const BURST_WIDTH_PHONE = 3.2;
 const BURST_INK = 2.2; // saturates the core so the burst reads as full dots, tapering at the tips
-const BURST_GAP_S = 1.6; // a pair of lines bursts at most this often
-const MAX_BURSTS = 3;
+const BURST_GAP_S = 4; // a pair of lines bursts at most this often (user: rarer)
+const BURST_ANY_GAP_S = 2.5; // and a new wave starts at least this long after the previous one (rare)
+const MAX_BURSTS = 2;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -138,7 +139,7 @@ export function strokeSamples(pts: Pt[], i: number, t: number, half: number, ste
   return out;
 }
 
-export type TrackedCrossing = { key: string; x: number; y: number; born: number; seen: number; ring?: boolean };
+export type TrackedCrossing = { key: string; x: number; y: number; born: number; seen: number };
 
 /**
  * Follows crossings from frame to frame. Per pair of lines, crossings are matched to the nearest remembered ones
@@ -170,7 +171,6 @@ export function trackCrossings(
       usedNow.add(i);
       used.add(j);
       cur[i].born = memory[j].born;
-      cur[i].ring = memory[j].ring;
     }
   }
   const ghosts = memory.filter((m, j) => !used.has(j) && time - m.seen < keep);
@@ -186,6 +186,9 @@ export function mountOrbitHalftone(opts: Opts) {
   let field = new Float32Array(0); // halftone ink per cell
   let memory: TrackedCrossing[] = []; // crossings seen recently, with birth times
   const lastRipple = new Map<string, number>(); // per pair of lines
+  let lastAnyBurst = -Infinity;
+  // Running waves, fixed to a spot on two lines (indices into orbits+ellipses, segment and position on each).
+  let waves: { born: number; a: number; i: number; t: number; b: number; j: number; u: number }[] = [];
   const kx = new Float32Array(256);
   // Soft edges for free: the dot canvas renders at 0.75× and the browser's upscale blurs it ~0.5px.
   const BLUR = 0.5;
@@ -350,41 +353,45 @@ export function mountOrbitHalftone(opts: Opts) {
     });
     const track = trackCrossings(memory, found, t);
     memory = track.memory;
-    // Calm when the sphere swings fast: a pair of lines bursts at most once per BURST_GAP_S, and at most
-    // MAX_BURSTS run at once.
-    let bursts = 0;
-    found.forEach((c, n) => {
-      const age = opts.reducedMotion ? Infinity : t - track.now[n].born;
-      if (age === 0) {
+    // Calm and rare (user): a pair of lines bursts at most once per BURST_GAP_S, a new wave starts at least
+    // BURST_ANY_GAP_S after the last, and at most MAX_BURSTS run at once.
+    if (!opts.reducedMotion) {
+      found.forEach((c, n) => {
+        if (t !== track.now[n].born) return; // only at the moment of crossing
         const last = lastRipple.get(c.key) ?? -Infinity;
-        if (t - last >= BURST_GAP_S) {
-          lastRipple.set(c.key, t);
-          track.now[n].ring = true;
-        }
-      }
-      if (!(age < BURST_S) || !track.now[n].ring || bursts >= MAX_BURSTS) return;
-      bursts++;
-      if (age < 0.05) dots.dataset.lastBurst = `${Math.round(c.x)},${Math.round(c.y)}`;
+        if (t - last < BURST_GAP_S || t - lastAnyBurst < BURST_ANY_GAP_S || waves.length >= MAX_BURSTS) return;
+        lastRipple.set(c.key, t);
+        lastAnyBurst = t;
+        // A wave stays fixed to its spot on both lines, so it keeps travelling even after they part.
+        const [oi, oj] = c.key.split('-').map(Number);
+        waves.push({ born: t, a: oi, i: c.i, t: c.t, b: oj, j: c.j, u: c.u });
+        dots.dataset.lastBurst = `${Math.round(c.x)},${Math.round(c.y)}`;
+      });
+    }
+    waves = waves.filter((v) => t - v.born < BURST_S);
+    for (const v of waves) {
       // A wave (user): it starts at the crossing, its front travels out along both lines, and the middle
       // empties first. The front eases out to `reach`; the band thins and fades as it goes.
-      const k01 = age / BURST_S;
+      const k01 = (t - v.born) / BURST_S;
       const front = reach * (1 - (1 - k01) ** 2);
       const band = Math.max(step * 1.2, (phone ? BURST_BAND_PHONE : BURST_BAND) * (1 - 0.5 * k01));
-      const fadeOut = (1 - k01) ** 0.9; // stays visible while it travels
+      const fadeOut = (1 - k01) ** 0.8; // stays visible while it travels
       const len = Math.min(reach + band, front + 2.5 * band);
-      for (const [line, k, f] of [[c.a, c.i, c.t], [c.b, c.j, c.u]] as const) {
+      for (const [line, k, f] of [[others[v.a], v.i, v.t], [others[v.b], v.j, v.u]] as const) {
         for (const p of strokeSamples(line, k, f, len, step)) {
           const off = (p.d - front) / band;
           const wave = Math.exp(-0.5 * off * off);
           if (wave < 0.03) continue;
-          const radius = widest * (0.35 + 0.65 * (1 - k01));
-          // Peak ink ≈ wave × fadeOut for a line of splats `step` apart with σ = radius.
-          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * fadeOut, radius);
+          // Never thinner than ~0.6 of the dot grid, or the wave falls between grid cells and vanishes early.
+          const radius = Math.max(PITCH * 0.6, widest * (0.35 + 0.65 * (1 - k01)));
+          // Ink falls faster than the fade so the dots shrink (not only lighten) towards the end, yet small dots
+          // stay visible right to the end (user).
+          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * fadeOut ** 1.4, radius);
         }
       }
-    });
+    }
     dots.dataset.crossings = String(found.length);
-    dots.dataset.bursts = String(bursts);
+    dots.dataset.bursts = String(waves.length);
     // Pointer: a soft swell under the cursor ('full' mode only).
     if (ptr.on > 0.01 && mode === 'full') splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
@@ -442,9 +449,11 @@ export function mountOrbitHalftone(opts: Opts) {
         list.push(xx * PITCH + PITCH / 2, yy * PITCH + PITCH / 2);
       }
     const sizes = new Set<number>();
+    let biggestBurstDot = 0; // px radius, for tests
     for (const [packed, list] of buckets) {
       const key = packed >> 1;
       sizes.add(key >> 4);
+      if (packed & 1) biggestBurstDot = Math.max(biggestBurstDot, (key >> 4) / 4);
       dctx.fillStyle = packed & 1 ? (opts.burstColor ?? opts.dotColor) : opts.dotColor;
       dctx.globalAlpha = (key & 15) / 12;
       const r = (key >> 4) / 4;
@@ -457,6 +466,7 @@ export function mountOrbitHalftone(opts: Opts) {
     }
     dctx.globalAlpha = 1;
     dots.dataset.sizeSteps = String(sizes.size);
+    dots.dataset.burstDot = String(biggestBurstDot);
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);

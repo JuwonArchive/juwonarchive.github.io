@@ -406,7 +406,7 @@ test.describe('hover halftone (user)', () => {
   });
 });
 
-test('crossings burst along both lines and vanish; at most a few at once (user)', async ({ page, isMobile }) => {
+test('crossings burst along both lines and vanish; rare, at most two at once (user)', async ({ page, isMobile }) => {
   await page.goto('/');
   await page.waitForTimeout(2500);
   const dots = page.locator('canvas[data-halftone]');
@@ -425,7 +425,7 @@ test('crossings burst along both lines and vanish; at most a few at once (user)'
     most = Math.max(most, Number(await dots.getAttribute('data-bursts')));
     await page.waitForTimeout(50);
   }
-  expect(most).toBeLessThanOrEqual(3);
+  expect(most).toBeLessThanOrEqual(2); // rarer (user)
   // …and vanishes once the bursts are over (stop turning the sphere first).
   if (!isMobile) await page.mouse.move(1300, 450);
   await expect.poll(async () => Number(await dots.getAttribute('data-bursts')), { timeout: 10_000 }).toBe(0);
@@ -497,15 +497,44 @@ test('a burst travels like a wave: it starts at the crossing and the middle clea
     };
     const out: { t: number; centre: number }[] = [];
     const t0 = performance.now();
-    while (performance.now() - t0 < 700) {
+    while (performance.now() - t0 < 1200) {
       out.push({ t: performance.now() - t0, centre: ink(bx, by, 10) });
       await new Promise((r) => setTimeout(r, 40));
     }
     return out;
   });
-  const peak = Math.max(...series.filter((s) => s.t < 250).map((s) => s.centre));
-  const late = series.filter((s) => s.t > 450).map((s) => s.centre);
+  const peak = Math.max(...series.filter((s) => s.t < 400).map((s) => s.centre));
+  const late = series.filter((s) => s.t > 800).map((s) => s.centre);
   expect(peak).toBeGreaterThan(1);
   // The middle has emptied while the wave is still out on the lines.
   expect(Math.max(...late)).toBeLessThan(peak * 0.35);
+});
+
+test('a wave spreads slowly and its dots shrink towards the end (user)', async ({ page, isMobile }) => {
+  await page.goto('/');
+  await page.waitForTimeout(2500);
+  if (!isMobile) await page.mouse.move(60, 450);
+  if (!isMobile) page.evaluate(async () => { const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!; for (let i = 0; i < 300 && !Number(c.dataset.bursts); i++) { window.dispatchEvent(new PointerEvent('pointermove', { clientX: 60 + (i % 100) * 13, clientY: 450 })); await new Promise((r) => setTimeout(r, 50)); } }).catch(() => {});
+  const series = await page.locator('canvas[data-halftone]').evaluate(async (c: HTMLCanvasElement) => {
+    let prev = 0;
+    for (let i = 0; i < 1200; i++) {
+      const n = Number(c.dataset.bursts);
+      if (n > prev) break;
+      prev = n;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const out: { t: number; dot: number; bursts: number }[] = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < 2200) {
+      out.push({ t: performance.now() - t0, dot: Number(c.dataset.burstDot), bursts: Number(c.dataset.bursts) });
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return out;
+  });
+  // Still going after a second (slow), and gone by ~2s.
+  expect(series.some((s) => s.t > 1100 && s.bursts > 0)).toBe(true);
+  const early = Math.max(...series.filter((s) => s.t < 500).map((s) => s.dot));
+  const late = series.filter((s) => s.t > 1300 && s.t < 1700 && s.bursts > 0).map((s) => s.dot);
+  expect(early).toBeGreaterThan(0);
+  if (late.length) expect(Math.max(...late)).toBeLessThan(early * 0.8);
 });
