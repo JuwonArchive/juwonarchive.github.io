@@ -233,6 +233,9 @@ test.describe('home graphics', () => {
       await expect(rm).toBeVisible();
       await expect(rm).toContainText(/CROSSINGS \d\d · WAVES \d\d/);
       await expect(rm).toContainText(/YAW .* · PITCH/);
+      // One line (user): it fits the width without wrapping.
+      expect(await rm.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(20);
+      expect(await rm.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
       const r = (await rm.boundingBox())!;
       const bar = (await page.locator('.home .top').boundingBox())!;
       const sphereTop = await page.evaluate(() => {
