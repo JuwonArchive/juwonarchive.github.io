@@ -116,3 +116,6 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          # GitHub Pages can take a while to sync files on busy days; the default 10 min gave up too early.
+          timeout: 1200000
