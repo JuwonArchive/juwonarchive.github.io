@@ -20,7 +20,7 @@ const markers = loadSite().works.map((w, i) => ({
   <div><dt>LAST WAVE</dt><dd data-ro="last">—</dd></div>
   <div class="gap"><dt>VIEW</dt><dd data-ro="view">—</dd></div>
 </dl>
-<!-- Phones (user): the readout on one line under the site label, top left. -->
+<!-- Phones (user): two short columns under the top bar: counts on the left, view angles on the right. -->
 <p class="readout-m mono" data-readout-m aria-hidden="true" hidden>
   <span data-rm="counts">—</span>
   <span data-rm="view">—</span>
@@ -72,9 +72,9 @@ const markers = loadSite().works.map((w, i) => ({
     const f = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toFixed(2);
     const update = () => {
       const d = src.dataset;
-      set('counts', `CROSSINGS ${String(d.crossings ?? 0).padStart(2, '0')} · WAVES ${String(d.bursts ?? 0).padStart(2, '0')}`);
+      set('counts', `CROSSINGS ${String(d.crossings ?? 0).padStart(2, '0')}\nWAVES ${String(d.bursts ?? 0).padStart(2, '0')}`);
       const [yaw] = (d.pose ?? '0,0').split(',').map(Number);
-      set('view', `YAW ${f(yaw)} · PITCH ${f(Number(d.tilt ?? 0))}`);
+      set('view', `YAW ${f(yaw)}\nPITCH ${f(Number(d.tilt ?? 0))}`);
     };
     update();
     setInterval(update, 200);
@@ -158,10 +158,9 @@ const markers = loadSite().works.map((w, i) => ({
     left: var(--gutter);
     right: var(--gutter);
     margin: 0;
-    /* Four values are few: one line on the left, under the site label (user). */
+    /* Echoes the top bar (user, mock D): counts on the left, view angles right-aligned on the right. */
     display: flex;
-    flex-wrap: nowrap;
-    white-space: nowrap;
+    justify-content: space-between;
     color: var(--muted);
     font-size: 8.5px;
     line-height: 1.5;
@@ -169,8 +168,8 @@ const markers = loadSite().works.map((w, i) => ({
     font-variant-numeric: tabular-nums;
     white-space: pre;
   }
-  .readout-m span + span::before {
-    content: ' · ';
+  .readout-m [data-rm='view'] {
+    text-align: right;
   }
   @media (min-width: 768px) {
     .readout-m {

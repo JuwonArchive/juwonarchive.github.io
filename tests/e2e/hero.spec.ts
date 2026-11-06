@@ -231,11 +231,19 @@ test.describe('home graphics', () => {
       await expect(page.locator('canvas[data-trace]')).not.toHaveAttribute('data-axes', 'extended');
       const rm = page.locator('[data-readout-m]');
       await expect(rm).toBeVisible();
-      await expect(rm).toContainText(/CROSSINGS \d\d · WAVES \d\d/);
-      await expect(rm).toContainText(/YAW .* · PITCH/);
-      // One line (user): it fits the width without wrapping.
-      expect(await rm.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(20);
-      expect(await rm.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      await expect(rm).toContainText(/CROSSINGS \d\d\s+WAVES \d\d/);
+      await expect(rm).toContainText(/YAW .*\s+PITCH/);
+      // Mock D (user): two lines each, counts flush left and view angles flush right, like the top bar.
+      const cols = await rm.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const [a, b] = [...el.querySelectorAll('span')].map((s) => s.getBoundingClientRect());
+        return { h: box.height, l: a.left - box.left, r: box.right - b.right, gap: b.left - a.right, top: Math.abs(a.top - b.top) };
+      });
+      expect(cols.h).toBeLessThan(32);
+      expect(cols.l).toBeLessThan(1);
+      expect(cols.r).toBeLessThan(1);
+      expect(cols.gap).toBeGreaterThan(40);
+      expect(cols.top).toBeLessThan(1);
       const r = (await rm.boundingBox())!;
       const bar = (await page.locator('.home .top').boundingBox())!;
       const sphereTop = await page.evaluate(() => {
