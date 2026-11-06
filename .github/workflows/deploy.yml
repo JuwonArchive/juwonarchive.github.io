@@ -78,9 +78,12 @@ jobs:
           fi
 
       # Heavy Notion videos are re-encoded during the sync (src/lib/notion/video-optimize.ts).
+      # Optional: without ffmpeg the sync keeps the original videos.
       - name: Install ffmpeg
         if: steps.decide.outputs.run == 'true'
-        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+        continue-on-error: true
+        timeout-minutes: 5
+        run: command -v ffmpeg || sudo apt-get -o DPkg::Lock::Timeout=60 install -y -qq --no-install-recommends ffmpeg
 
       - name: Sync from Notion
         if: steps.decide.outputs.run == 'true'
