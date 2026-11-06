@@ -111,7 +111,12 @@ test.describe('media at a uniform 880px width (user)', () => {
             return { w: box.width, h: box.height, aspect: vid.videoWidth / vid.videoHeight, fit: getComputedStyle(vid).objectFit };
           }
           const crop = el.querySelector<HTMLElement>('[data-ig-crop]');
-          const aspect = crop ? Number(crop.dataset.w) / Number(crop.dataset.h) : 16 / 9;
+          // Cropped Instagram post: its own shape. Instagram post of unknown size: the full 400×720 embed. Else a 16:9 player.
+          const aspect = crop
+            ? Number(crop.dataset.w) / Number(crop.dataset.h)
+            : el.classList.contains('frame--portrait')
+              ? 400 / 720
+              : 16 / 9;
           return { w: box.width, h: box.height, aspect, fit: 'contain' };
         });
         widths.add(Math.round(r.w));
