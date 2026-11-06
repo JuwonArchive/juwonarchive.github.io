@@ -51,8 +51,11 @@ const MIN_CROSS_ANGLE = (28 * Math.PI) / 180;
 // A new crossing grows its stroke over this long and sends out one ripple ring (user).
 const STROKE_GROW_S = 0.6;
 const CROSS_RIPPLE_S = 1.4;
-const CROSS_RIPPLE_REACH = 110;
-const CROSS_RIPPLE_REACH_PHONE = 50;
+// Thin, short rings (user: the first ones were too thick and spread too far).
+const CROSS_RIPPLE_REACH = 60;
+const CROSS_RIPPLE_REACH_PHONE = 32;
+const CROSS_RIPPLE_WIDTH = 2.5; // ring σ, px
+const CROSS_RIPPLE_WIDTH_PHONE = 2.4; // just over half the 4px grid, so the ring still draws dots
 const RIPPLE_GAP_S = 1.6;
 const MAX_CROSS_RIPPLES = 3;
 const MUTED = '#7b8794';
@@ -374,7 +377,7 @@ export function mountOrbitHalftone(opts: Opts) {
         ripples++;
         const k = age / CROSS_RIPPLE_S;
         const r = 6 + k * (phone ? CROSS_RIPPLE_REACH_PHONE : CROSS_RIPPLE_REACH);
-        const sigma = phone ? 3 : 5;
+        const sigma = phone ? CROSS_RIPPLE_WIDTH_PHONE : CROSS_RIPPLE_WIDTH;
         const amp = 0.85 * (1 - k) ** 1.4;
         const count = Math.max(12, Math.ceil((2 * Math.PI * r) / step));
         const amount = ((amp * ((2 * Math.PI * r) / count)) / (sigma * Math.sqrt(2 * Math.PI)));
