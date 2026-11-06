@@ -69,3 +69,34 @@ export function plan(posts: IgPost[], pages: ArchivePage[], known: Set<string>, 
   }
   return result;
 }
+
+/** Caption text of a post from its public "embed/captioned" page (hashtags included), or null. */
+export function captionFromEmbed(html: string): string | null {
+  const start = html.indexOf('class="Caption"');
+  if (start === -1) return null;
+  const end = html.indexOf('</div>', start);
+  const inner = html.slice(html.indexOf('>', start) + 1, end === -1 ? undefined : end);
+  return inner
+    .replace(/<a class="CaptionUsername"[\s\S]*?<\/a>/, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .trim();
+}
+
+/** Instagram post URLs in a (JSON-serialisable) Notion subtree, one clean URL per post code. */
+export function postUrlsIn(tree: unknown): Map<string, string> {
+  const out = new Map<string, string>();
+  const text = JSON.stringify(tree ?? []);
+  for (const m of text.matchAll(/https?:\/\/(?:www\.)?instagram\.com\/(?:[\w.]+\/)?(p|reels?|tv)\/([\w-]+)/gi)) {
+    const kind = m[1].toLowerCase() === 'reels' ? 'reel' : m[1].toLowerCase();
+    if (!out.has(m[2])) out.set(m[2], `https://www.instagram.com/${kind}/${m[2]}/`);
+  }
+  return out;
+}

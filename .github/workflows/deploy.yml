@@ -30,8 +30,8 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # New Instagram posts go to the matching Notion archive by hashtag (docs/INSTAGRAM.ko.md).
-      # Off until the IG_TOKEN secret exists; never blocks the site update.
+      # Instagram posts shared to the Notion INBOX move to their archive by hashtag (docs/INSTAGRAM.ko.md).
+      # Never blocks the site update.
       - name: Instagram → Notion
         continue-on-error: true
         run: npx tsx scripts/ig-to-notion.ts

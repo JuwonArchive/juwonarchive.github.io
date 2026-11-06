@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codesIn, hashtags, plan, routeFor, shortcode, type IgPost } from '../../src/lib/ig-route';
+import { captionFromEmbed, codesIn, hashtags, plan, postUrlsIn, routeFor, shortcode, type IgPost } from '../../src/lib/ig-route';
 
 const pages = [
   { title: '3D DESIGN', pageId: 'p3d' },
@@ -78,5 +78,29 @@ describe('plan', () => {
   });
   it('a tag whose archive is missing in Notion is left unsorted', () => {
     expect(plan([post('T', '#touchdesigner')], pages.slice(0, 3), new Set(), SINCE).unsorted).toHaveLength(1);
+  });
+});
+
+describe('INBOX helpers (user: personal account, share to Notion)', () => {
+  it('reads the caption and hashtags from a public embed page', () => {
+    const html =
+      '<div class="Caption"><a class="CaptionUsername" href="x">baboyeonggaam</a><br /><br />Scifi_corridor &amp; more<br /><br />' +
+      '<a href="/explore/tags/c4d/">#c4d</a> <a href="/explore/tags/3d/">#3d</a></div><div class="Footer">';
+    const caption = captionFromEmbed(html)!;
+    expect(caption).toContain('Scifi_corridor & more');
+    expect(caption).not.toContain('baboyeonggaam');
+    expect(routeFor(caption)).toBe('3D DESIGN');
+    expect(captionFromEmbed('<html>no caption</html>')).toBeNull();
+  });
+  it('collects clean post URLs from whatever Notion saved (bookmark, link, page title)', () => {
+    const tree = [
+      { type: 'bookmark', bookmark: { url: 'https://www.instagram.com/reel/AAA/?igsh=xyz' } },
+      { type: 'child_page', child_page: { title: 'https://instagram.com/p/BBB/' } },
+      { type: 'paragraph', text: 'https://www.instagram.com/reel/AAA/' },
+    ];
+    expect([...postUrlsIn(tree)]).toEqual([
+      ['AAA', 'https://www.instagram.com/reel/AAA/'],
+      ['BBB', 'https://www.instagram.com/p/BBB/'],
+    ]);
   });
 });

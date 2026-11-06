@@ -62,6 +62,8 @@ function readRoot(rootBlocks: NBlock[], showPhone: boolean) {
     }
     const text = blockText(b).trim();
     if (!text) continue;
+    // The Instagram INBOX page lives on the root page but is not site content.
+    if (b.type === 'child_page' && /^inbox$/i.test(text)) continue;
     if (section === 'contact' && ['child_page', 'paragraph', 'bulleted_list_item'].includes(b.type)) {
       if (EMAIL_RE.test(text)) contact.email = text;
       else if (PHONE_RE.test(text)) {
