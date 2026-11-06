@@ -5,6 +5,10 @@
  */
 import { existsSync, renameSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import ffmpegStatic from 'ffmpeg-static';
+
+/** Pinned static ffmpeg from npm (fast and reliable in CI); the system one as a fallback. */
+const FFMPEG = (ffmpegStatic as unknown as string | null) || 'ffmpeg';
 import { join } from 'node:path';
 import type { SiteData, Warning } from '../site-schema';
 
@@ -20,7 +24,7 @@ export type Encoder = (input: string, output: string, width?: number) => boolean
 
 export const ffmpegEncoder: Encoder = (input, output, width = MAX_WIDTH) => {
   const r = spawnSync(
-    'ffmpeg',
+    FFMPEG,
     [
       '-y', '-loglevel', 'error', '-i', input,
       '-vf', `scale='min(${width},iw)':-2`,

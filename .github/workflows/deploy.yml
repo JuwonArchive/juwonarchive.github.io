@@ -77,14 +77,7 @@ jobs:
             echo "Notion unchanged — nothing to deploy."
           fi
 
-      # Heavy Notion videos are re-encoded during the sync (src/lib/notion/video-optimize.ts).
-      # Optional: without ffmpeg the sync keeps the original videos.
-      - name: Install ffmpeg
-        if: steps.decide.outputs.run == 'true'
-        continue-on-error: true
-        timeout-minutes: 5
-        run: command -v ffmpeg || sudo apt-get -o DPkg::Lock::Timeout=60 install -y -qq --no-install-recommends ffmpeg
-
+      # Heavy Notion videos are re-encoded during the sync with the pinned ffmpeg-static from npm.
       - name: Sync from Notion
         if: steps.decide.outputs.run == 'true'
         run: npm run sync
