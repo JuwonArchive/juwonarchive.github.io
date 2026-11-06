@@ -36,6 +36,8 @@ const RIPPLE_REACH = 120; // px the ring travels
 const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
 // The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
 const IDLE_MS = 3000; // 3s of rest before the hover halftone fades (user)
+// Beyond this distance neither the spot (4σ) nor the ripple ring reaches.
+const REACH = Math.max(4 * REVEAL_SIGMA, 10 + RIPPLE_REACH + 3 * RIPPLE_WIDTH);
 // Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
 const BAND = 4.5;
 const PHONE_BAND = 3;
@@ -254,10 +256,11 @@ export function mountOrbitHalftone(opts: Opts) {
         if (subtle) {
           const base = a * 0.75;
           a = base;
-          if (ptr.on > 0.01) {
+          // Only cells the spot or the ripple can reach need the pointer maths (saves ~90% of a frame's work).
+          const px = xx * PITCH + PITCH / 2 - ptr.x;
+          const py = yy * PITCH + PITCH / 2 - ptr.y;
+          if (ptr.on > 0.01 && px < REACH && px > -REACH && py < REACH && py > -REACH) {
             // Faint along the orbits; the pointer reveals the halftone around it.
-            const px = xx * PITCH + PITCH / 2 - ptr.x;
-            const py = yy * PITCH + PITCH / 2 - ptr.y;
             const d2 = px * px + py * py;
             const reveal = Math.exp(-d2 / (2 * REVEAL_SIGMA * REVEAL_SIGMA));
             const dr = Math.sqrt(d2) - ringR;

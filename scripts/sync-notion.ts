@@ -8,6 +8,7 @@ import { publishedHash, snapshotHash } from '../src/lib/notion/hash';
 import { mapSnapshot } from '../src/lib/notion/map';
 import { localizeMedia } from '../src/lib/notion/media';
 import { localizeInstagram } from '../src/lib/notion/instagram';
+import { optimizeVideos } from '../src/lib/notion/video-optimize';
 import { config } from '../src/config';
 import type { Warning } from '../src/lib/site-schema';
 
@@ -51,7 +52,7 @@ async function main() {
   // so a crash midway never leaves site.json pointing at deleted files.
   const TMP = 'public/media.tmp';
   rmSync(TMP, { recursive: true, force: true });
-  const localized = await localizeInstagram(await localizeMedia(site, TMP, warn), TMP, warn);
+  const localized = optimizeVideos(await localizeInstagram(await localizeMedia(site, TMP, warn), TMP, warn), TMP, warn);
 
   mkdirSync('src/data', { recursive: true });
   rmSync('public/media', { recursive: true, force: true });

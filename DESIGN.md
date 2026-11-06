@@ -194,3 +194,4 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 - Instagram videos whose file Instagram withholds (usually library music) show their cover with a centred "▶ PLAY ON INSTAGRAM" pill linking to the post; too-large videos stay embeds. Original files uploaded to Notion always play on the site.
 - Archive boxes: the card takes the cover's own shape (largest that fits), so covers are never cropped.
 - Instagram carousels: every slide is shown in order (videos, images, or play-on-Instagram covers).
+- Performance (2026-11-06): Notion videos over 3 MB are re-encoded at sync (H.264, ≤1600px, CRF 27, fast start; 39 MB → 8 MB). The home halftone does pointer maths only within reach of the spot/ripple (43 → 58 fps at 4× CPU slowdown).
