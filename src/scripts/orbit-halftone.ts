@@ -35,18 +35,19 @@ const RIPPLE_PERIOD = 1.6;
 const RIPPLE_REACH = 120; // px the ring travels
 const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
 // The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
-const IDLE_MS = 3000;
-// Overlap → ink. Two full-strength lines crossing give 1; the gain lets fainter crossings still show.
-const OVERLAP_GAIN = 2.2; // 3s of rest before the hover halftone fades (user)
+const IDLE_MS = 3000; // 3s of rest before the hover halftone fades (user)
 // Beyond this distance neither the spot (4σ) nor the ripple ring reaches.
 const REACH = Math.max(4 * REVEAL_SIGMA, 10 + RIPPLE_REACH + 3 * RIPPLE_WIDTH);
 // Halftone band along the orbits, as a Gaussian σ in px (narrower, user).
 const BAND = 4.5;
 const PHONE_BAND = 3;
-// Halftone now appears only where elements overlap (user), so each element's ink reaches wider than the old
-// band: crossings then form visible lens shapes that peak in the middle and taper to both ends.
-const OVERLAP_BAND = 9;
-const PHONE_OVERLAP_BAND = 4.5;
+// Crossing strokes (user: wide in the middle, pointed at both ends, only where lines cross).
+const STROKE_HALF = 95; // px of orbit on each side of the crossing
+const STROKE_HALF_PHONE = 42;
+const STROKE_WIDTH = 7; // σ at the crossing, px
+const STROKE_WIDTH_PHONE = 4;
+const STROKE_INK = 1.15;
+const MIN_CROSS_ANGLE = (28 * Math.PI) / 180;
 const MUTED = '#7b8794';
 
 /** Points of a circle of radius r in a plane tilted by (ax around x, az around z). */
@@ -64,15 +65,76 @@ function ring(r: number, ax: number, az: number, n = 160, phase = 0): V3[] {
   return out;
 }
 
+type Pt = { x: number; y: number };
+
+/** Where polyline `a` crosses polyline `b` at more than `minAngle`: segment index in `a` and position t∈[0,1). */
+export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: number }[] {
+  const out: { i: number; t: number }[] = [];
+  const sinMin = Math.sin(minAngle);
+  for (let i = 1; i < a.length; i++) {
+    const p = a[i - 1];
+    const rx = a[i].x - p.x;
+    const ry = a[i].y - p.y;
+    const minX = Math.min(p.x, a[i].x), maxX = Math.max(p.x, a[i].x);
+    const minY = Math.min(p.y, a[i].y), maxY = Math.max(p.y, a[i].y);
+    for (let j = 1; j < b.length; j++) {
+      const q = b[j - 1];
+      const sx = b[j].x - q.x;
+      const sy = b[j].y - q.y;
+      if (Math.max(q.x, b[j].x) < minX || Math.min(q.x, b[j].x) > maxX || Math.max(q.y, b[j].y) < minY || Math.min(q.y, b[j].y) > maxY) continue;
+      const den = rx * sy - ry * sx;
+      if (!den) continue;
+      const t = ((q.x - p.x) * sy - (q.y - p.y) * sx) / den;
+      const u = ((q.x - p.x) * ry - (q.y - p.y) * rx) / den;
+      if (t < 0 || t >= 1 || u < 0 || u >= 1) continue;
+      // |sin| of the angle between the two segments.
+      if (Math.abs(den) / (Math.hypot(rx, ry) * Math.hypot(sx, sy)) < sinMin) continue;
+      out.push({ i, t });
+    }
+  }
+  return out;
+}
+
+/** Points along `pts` within `half` px of arc length either side of a crossing, with taper w = 1 − (s/half)². */
+export function strokeSamples(pts: Pt[], i: number, t: number, half: number, step: number): { x: number; y: number; w: number }[] {
+  const at = (k: number, f: number) => ({ x: pts[k - 1].x + (pts[k].x - pts[k - 1].x) * f, y: pts[k - 1].y + (pts[k].y - pts[k - 1].y) * f });
+  const out: { x: number; y: number; w: number }[] = [];
+  const centre = at(i, t);
+  out.push({ ...centre, w: 1 });
+  for (const dir of [1, -1]) {
+    let s = 0;
+    let next = step;
+    let k = i;
+    let cur = centre;
+    while (s < half) {
+      // Walk to the end of the current segment in this direction (orbits are closed loops).
+      const target = dir > 0 ? { x: pts[k].x, y: pts[k].y } : { x: pts[k - 1].x, y: pts[k - 1].y };
+      const seg = Math.hypot(target.x - cur.x, target.y - cur.y);
+      while (next <= s + seg && next < half) {
+        const r = seg ? (next - s) / seg : 0;
+        const x = cur.x + (target.x - cur.x) * r;
+        const y = cur.y + (target.y - cur.y) * r;
+        const q = next / half;
+        out.push({ x, y, w: 1 - q * q });
+        next += step;
+      }
+      s += seg;
+      cur = target;
+      if (dir > 0) k = k + 1 >= pts.length ? 1 : k + 1;
+      else k = k - 1 < 1 ? pts.length - 1 : k - 1;
+      if (s > 10_000) break;
+    }
+  }
+  return out;
+}
+
 export function mountOrbitHalftone(opts: Opts) {
   const { dots, lines } = opts;
   const dctx = dots.getContext('2d');
   const lctx = lines?.getContext('2d') ?? null;
   if (!dctx) return;
   dots.dataset.form = 'orbit';
-  let field = new Float32Array(0); // Σ of every element's ink (clamped per element)
-  let fieldSq = new Float32Array(0); // Σ of squares: with Σ it gives the overlap between elements
-  let elem = new Float32Array(0); // the element being drawn
+  let field = new Float32Array(0); // halftone ink per cell
   const kx = new Float32Array(256);
   // Soft edges for free: the dot canvas renders at 0.75× and the browser's upscale blurs it ~0.5px.
   const BLUR = 0.5;
@@ -193,33 +255,8 @@ export function mountOrbitHalftone(opts: Opts) {
     const PITCH = w < 768 ? PHONE_PITCH : DESK_PITCH;
     const cols = Math.ceil(w / PITCH);
     const rows = Math.ceil(h / PITCH);
-    if (field.length !== cols * rows) {
-      field = new Float32Array(cols * rows);
-      fieldSq = new Float32Array(cols * rows);
-      elem = new Float32Array(cols * rows);
-    } else {
-      field.fill(0);
-      fieldSq.fill(0);
-    }
-    // Each element (orbit, centre ellipse, marker) is splatted on its own, then folded into Σ and Σ².
-    // Halftone appears only where elements overlap (user): Σ_{i<j} e_i·e_j = (Σ² − Σsq) / 2.
-    let lo = Infinity;
-    let hi = -1;
-    const beginElement = () => {
-      lo = Infinity;
-      hi = -1;
-    };
-    const endElement = () => {
-      if (hi < 0) return;
-      for (let k = lo; k <= hi; k++) {
-        const v = elem[k];
-        if (!v) continue;
-        const c = v > 1 ? 1 : v;
-        field[k] += c;
-        fieldSq[k] += c * c;
-        elem[k] = 0;
-      }
-    };
+    if (field.length !== cols * rows) field = new Float32Array(cols * rows);
+    else field.fill(0);
     const splat = (x: number, y: number, amount: number, radius: number) => {
       const cxi = x / PITCH - 0.5;
       const cyi = y / PITCH - 0.5;
@@ -235,72 +272,37 @@ export function mountOrbitHalftone(opts: Opts) {
       for (let yy = y0; yy <= y1; yy++) {
         const gy = amount * Math.exp(-((yy - cyi) ** 2) * inv);
         const row = yy * cols;
-        for (let xx = x0; xx <= x1; xx++) elem[row + xx] += gy * gx[xx - x0];
-      }
-      lo = Math.min(lo, y0 * cols + x0);
-      hi = Math.max(hi, y1 * cols + x1);
-    };
-    const along = (pts: { x: number; y: number }[], amount: (i: number, z: number) => number, radius: number) => {
-      for (let i = 1; i < pts.length; i++) {
-        const p0 = pts[i - 1];
-        const p1 = pts[i];
-        const len = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-        const n = Math.max(1, Math.ceil(len / (PITCH * 0.8)));
-        const z = (((p0 as { z?: number }).z ?? 0) + ((p1 as { z?: number }).z ?? 0)) / 2;
-        const amt = amount(i, z) * (len / n / PITCH);
-        for (let s = 0; s < n; s++) splat(p0.x + ((p1.x - p0.x) * s) / n, p0.y + ((p1.y - p0.y) * s) / n, amt, radius);
+        for (let xx = x0; xx <= x1; xx++) field[row + xx] += gy * gx[xx - x0];
       }
     };
-    const silhouette = Array.from({ length: 121 }, (_, i) => ({ x: g.cx + Math.cos((i / 120) * TAU) * g.R, y: g.cy + Math.sin((i / 120) * TAU) * g.R }));
     const mode = opts.mode ?? 'subtle';
     dots.dataset.mode = mode;
     const subtle = mode === 'subtle';
-    if (!subtle) {
-      beginElement();
-      along(silhouette, () => 0.4, 7);
-      endElement();
-    }
-    // A narrower band keeps the same peak ink: the line's ink scales with σ, so compensate.
-    const band = w < 768 ? PHONE_OVERLAP_BAND : OVERLAP_BAND;
-    const bandGain = 7.5 / band;
-    // Orbits: darker in front, fainter behind, with a slow pulse travelling along each line.
-    g.orbits.forEach((o, oi) => {
-      beginElement();
-      along(
-        o,
-        (i, z) => {
-          const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, z));
-          return (0.35 + 0.65 * front * (0.5 + 0.5 * Math.sin(i * 0.12 - t * 1.4 + oi * 2))) * 0.6 * bandGain;
-        },
-        band,
-      );
-      endElement();
-    });
-    // Centre ellipses and the markers are elements too: where an orbit crosses them, dots appear.
-    for (const o of g.centre) {
-      beginElement();
-      along(o, () => 0.5 * bandGain, band);
-      endElement();
-    }
-    opts.labels.forEach((_, i) => {
-      const p = markerAt(g, i, t);
-      beginElement();
-      splat(p.x, p.y, 1.1, band * 2.2);
-      endElement();
-    });
-    if (!subtle) {
-      for (const o of g.dashed) {
-        beginElement();
-        along(o, () => 0.12, 6);
-        endElement();
+    // Brush strokes (user): where an orbit crosses another orbit or a centre ellipse, a halftone stroke runs
+    // along the orbit, widest at the crossing and tapering to a point at both ends. Shallow crossings (lines
+    // running side by side) get none, so the sphere's edge stays clean.
+    const phone = w < 768;
+    const half = phone ? STROKE_HALF_PHONE : STROKE_HALF;
+    const widest = phone ? STROKE_WIDTH_PHONE : STROKE_WIDTH;
+    const step = PITCH * 0.7;
+    let strokes = 0;
+    const others = [...g.orbits, ...g.centre];
+    g.orbits.forEach((orbit, oi) => {
+      for (let oj = 0; oj < others.length; oj++) {
+        if (oj <= oi) continue; // each orbit pair once; every orbit against both ellipses
+        for (const c of crossings(orbit, others[oj], MIN_CROSS_ANGLE)) {
+          strokes++;
+          for (const p of strokeSamples(orbit, c.i, c.t, half, step)) {
+            const radius = widest * (0.18 + 0.82 * p.w);
+            // Peak ink ≈ p.w for a line of splats `step` apart with σ = radius.
+            splat(p.x, p.y, (p.w * step) / (radius * Math.sqrt(2 * Math.PI)) * STROKE_INK, radius);
+          }
+        }
       }
-    }
-    // Pointer: a soft swell under the cursor.
-    if (ptr.on > 0.01 && mode === 'full') {
-      beginElement();
-      splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
-      endElement();
-    }
+    });
+    dots.dataset.strokes = String(strokes);
+    // Pointer: a soft swell under the cursor ('full' mode only).
+    if (ptr.on > 0.01 && mode === 'full') splat(ptr.x, ptr.y, 0.85 * ptr.on, 45);
 
     // 2. Halftone screen, batched: dots of similar size/alpha share one path.
     dctx.setTransform(DOT_SCALE, 0, 0, DOT_SCALE, 0, 0);
@@ -319,9 +321,7 @@ export function mountOrbitHalftone(opts: Opts) {
     for (let yy = 0; yy < rows; yy++)
       for (let xx = 0; xx < cols; xx++) {
         const k = yy * cols + xx;
-        // Overlap between elements; the product makes each crossing peak in the middle and taper to both ends.
-        const sum = field[k];
-        let a = sum ? Math.min(1, OVERLAP_GAIN * ((sum * sum - fieldSq[k]) / 2)) : 0;
+        let a = Math.min(1, field[k]);
         if (mode === 'none') continue;
         if (subtle) {
           const base = a * 0.75;
@@ -345,7 +345,8 @@ export function mountOrbitHalftone(opts: Opts) {
         const rq = Math.round((MIN_R + (max - MIN_R) * Math.pow(Math.max(0, a - 0.12) / 0.88, 0.85)) * 4); // quarter-px steps
         // Outermost dots fade in instead of popping on at a hard threshold (no visible ring).
         const fade = Math.min(1, (a - 0.06) / 0.2);
-        const aq = Math.round((0.45 + 0.55 * a) * fade * fade * (3 - 2 * fade) * 12); // 12 alpha steps
+        // Fade (user): further from a stroke's middle the dots get lighter as well as smaller.
+        const aq = Math.round((0.12 + 0.88 * Math.pow(a, 1.1)) * fade * fade * (3 - 2 * fade) * 12); // 12 alpha steps
         if (!aq) continue;
         const key = rq * 16 + aq;
         let list = buckets.get(key);
@@ -369,7 +370,7 @@ export function mountOrbitHalftone(opts: Opts) {
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);
-    dots.dataset.ink = 'overlap';
+    dots.dataset.ink = 'strokes';
     dots.dataset.ripple = String(RIPPLE_PERIOD);
     dots.dataset.idle = String(IDLE_MS);
     dots.dataset.hover = ptr.on.toFixed(2);

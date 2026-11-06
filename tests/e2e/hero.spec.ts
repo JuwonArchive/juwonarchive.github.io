@@ -52,13 +52,14 @@ test.describe('home graphics', () => {
           for (let i = 3; i < d.length; i += 4) a += d[i];
           const mean = a / (d.length / 4);
           total++;
-          if (mean > 8) inked++;
+          if (mean > 2) inked++; // strokes fade out towards their ends (user)
           if (mean > 40) dense++;
           else if (mean > 22 && c.clientWidth < 768) dense++; // phones use smaller dots (user)
         }
       return { inked: inked / total, dense: dense / total };
     });
-    expect(share.inked).toBeGreaterThan(0.05); // smaller sphere covers less of the screen (user)
+    // Only crossing strokes carry ink now (user), so most of the screen is clean.
+    expect(share.inked).toBeGreaterThan(0.003);
     expect(share.inked).toBeLessThan(0.75);
     // Variant ③: at rest the halftone is faint along the orbits (no dense areas required);
     // the pointer test below covers the reveal.
@@ -408,11 +409,12 @@ test.describe('hover halftone (user)', () => {
   });
 });
 
-test('halftone appears only where elements overlap, tapering at both ends (user)', async ({ page }) => {
+test('halftone appears only as strokes where lines cross, tapering at both ends (user)', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const dots = page.locator('canvas[data-halftone]');
-  await expect(dots).toHaveAttribute('data-ink', 'overlap');
+  await expect(dots).toHaveAttribute('data-ink', 'strokes');
+  expect(Number(await dots.getAttribute('data-strokes'))).toBeGreaterThan(0);
   // Away from every crossing (a plain stretch of the right-hand orbit edge is still crowded, so use the
   // empty quarter left of centre inside the sphere) there is no ink at rest.
   const r = await page.evaluate(() => {
@@ -421,4 +423,45 @@ test('halftone appears only where elements overlap, tapering at both ends (user)
     return { x: b.left + Number(c.dataset.cx), y: b.top + Number(c.dataset.cy), r: Number(c.dataset.r) };
   });
   expect(await inkAround(page, r.x - r.r * 0.35, r.y - r.r * 0.55, 6)).toBeLessThan(2);
+});
+
+test('stroke dots fade: lighter as well as smaller away from the middle (user)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'measured on desktop dots');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  // Collect each dot's size and opacity straight from the canvas: bigger dots must be more opaque.
+  const pairs = await page.locator('canvas[data-halftone]').evaluate((c: HTMLCanvasElement) => {
+    const ctx = c.getContext('2d')!;
+    const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+    const seen = new Uint8Array(width * height);
+    const out: [number, number][] = [];
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        if (seen[i] || data[i * 4 + 3] < 8) continue;
+        // Flood the dot: area ≈ size, peak alpha ≈ colour strength.
+        let area = 0;
+        let peak = 0;
+        const stack = [i];
+        seen[i] = 1;
+        while (stack.length) {
+          const k = stack.pop()!;
+          area++;
+          peak = Math.max(peak, data[k * 4 + 3]);
+          for (const n of [k - 1, k + 1, k - width, k + width])
+            if (n >= 0 && n < width * height && !seen[n] && data[n * 4 + 3] >= 8) {
+              seen[n] = 1;
+              stack.push(n);
+            }
+        }
+        if (area < 400) out.push([area, peak]);
+      }
+    return out;
+  });
+  expect(pairs.length).toBeGreaterThan(10);
+  const sorted = [...pairs].sort((a, b) => a[0] - b[0]);
+  const q = Math.floor(sorted.length / 4);
+  const avg = (xs: [number, number][]) => xs.reduce((s, p) => s + p[1], 0) / xs.length;
+  // The largest quarter of dots is clearly more opaque than the smallest quarter.
+  expect(avg(sorted.slice(-q))).toBeGreaterThan(avg(sorted.slice(0, q)) * 1.4);
 });
