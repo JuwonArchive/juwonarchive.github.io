@@ -510,7 +510,7 @@ test('a burst travels like a wave: it starts at the crossing and the middle clea
   expect(Math.max(...late)).toBeLessThan(peak * 0.35);
 });
 
-test('a wave spreads slowly and its dots shrink towards the end (user)', async ({ page, isMobile }) => {
+test('a wave spreads slowly and its dots shrink gradually, not only at the end (user)', async ({ page, isMobile }) => {
   await page.goto('/');
   await page.waitForTimeout(2500);
   if (!isMobile) await page.mouse.move(60, 450);
@@ -526,15 +526,21 @@ test('a wave spreads slowly and its dots shrink towards the end (user)', async (
     const out: { t: number; dot: number; bursts: number }[] = [];
     const t0 = performance.now();
     while (performance.now() - t0 < 2200) {
-      out.push({ t: performance.now() - t0, dot: Number(c.dataset.burstDot), bursts: Number(c.dataset.bursts) });
+      out.push({ t: performance.now() - t0, dot: Number(c.dataset.burstDotMean), bursts: Number(c.dataset.bursts) });
       await new Promise((r) => setTimeout(r, 50));
     }
     return out;
   });
   // Still going after a second (slow), and gone by ~2s.
   expect(series.some((s) => s.t > 1100 && s.bursts > 0)).toBe(true);
-  const early = Math.max(...series.filter((s) => s.t < 500).map((s) => s.dot));
-  const late = series.filter((s) => s.t > 1300 && s.t < 1700 && s.bursts > 0).map((s) => s.dot);
-  expect(early).toBeGreaterThan(0);
-  if (late.length) expect(Math.max(...late)).toBeLessThan(early * 0.8);
+  // Mean dot size falls step by step: start > middle > late.
+  const mean = (a: number, b: number) => {
+    const xs = series.filter((s) => s.t >= a && s.t < b && s.dot > 0).map((s) => s.dot);
+    return xs.length ? xs.reduce((x, y) => x + y, 0) / xs.length : NaN;
+  };
+  const start = mean(0, 300);
+  const middle = mean(600, 900);
+  const late = mean(1200, 1500);
+  expect(start).toBeGreaterThan(middle);
+  if (!Number.isNaN(late)) expect(middle).toBeGreaterThan(late);
 });

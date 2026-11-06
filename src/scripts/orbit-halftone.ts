@@ -46,13 +46,13 @@ const PHONE_BAND = 3;
 // Crossing bursts (user): when two lines meet, halftone shoots out along both lines and fades away.
 const MIN_CROSS_ANGLE = (28 * Math.PI) / 180; // shallower meetings are lines running side by side
 const BURST_S = 1.8; // whole life of a burst: a slow spread (user), reaching its end as it fades out
-const BURST_BAND = 14; // length of the travelling wave band along the line (σ, px)
-const BURST_BAND_PHONE = 7;
+const BURST_BAND = 26; // length of the wave crest along the line (σ, px; user: longer)
+const BURST_BAND_PHONE = 13;
 const BURST_REACH = 120; // px along each line, each way
 const BURST_REACH_PHONE = 55;
 const BURST_WIDTH = 4; // σ at the crossing, px
 const BURST_WIDTH_PHONE = 3.2;
-const BURST_INK = 2.2; // saturates the core so the burst reads as full dots, tapering at the tips
+const BURST_INK = 1.05; // peak ink at the start ≈ full dots, so they start shrinking right away and keep going (user)
 const BURST_GAP_S = 4; // a pair of lines bursts at most this often (user: rarer)
 const BURST_ANY_GAP_S = 2.5; // and a new wave starts at least this long after the previous one (rare)
 const MAX_BURSTS = 2;
@@ -375,7 +375,6 @@ export function mountOrbitHalftone(opts: Opts) {
       const k01 = (t - v.born) / BURST_S;
       const front = reach * (1 - (1 - k01) ** 2);
       const band = Math.max(step * 1.2, (phone ? BURST_BAND_PHONE : BURST_BAND) * (1 - 0.5 * k01));
-      const fadeOut = (1 - k01) ** 0.8; // stays visible while it travels
       const len = Math.min(reach + band, front + 2.5 * band);
       for (const [line, k, f] of [[others[v.a], v.i, v.t], [others[v.b], v.j, v.u]] as const) {
         for (const p of strokeSamples(line, k, f, len, step)) {
@@ -384,9 +383,8 @@ export function mountOrbitHalftone(opts: Opts) {
           if (wave < 0.03) continue;
           // Never thinner than ~0.6 of the dot grid, or the wave falls between grid cells and vanishes early.
           const radius = Math.max(PITCH * 0.6, widest * (0.35 + 0.65 * (1 - k01)));
-          // Ink falls faster than the fade so the dots shrink (not only lighten) towards the end, yet small dots
-          // stay visible right to the end (user).
-          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * fadeOut ** 1.4, radius);
+          // Ink falls steadily over the whole life, so the dots shrink gradually, not only at the end (user).
+          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * (1 - k01), radius);
         }
       }
     }
@@ -450,10 +448,16 @@ export function mountOrbitHalftone(opts: Opts) {
       }
     const sizes = new Set<number>();
     let biggestBurstDot = 0; // px radius, for tests
+    let burstDotSum = 0;
+    let burstDotCount = 0;
     for (const [packed, list] of buckets) {
       const key = packed >> 1;
       sizes.add(key >> 4);
-      if (packed & 1) biggestBurstDot = Math.max(biggestBurstDot, (key >> 4) / 4);
+      if (packed & 1) {
+        biggestBurstDot = Math.max(biggestBurstDot, (key >> 4) / 4);
+        burstDotSum += ((key >> 4) / 4) * (list.length / 2);
+        burstDotCount += list.length / 2;
+      }
       dctx.fillStyle = packed & 1 ? (opts.burstColor ?? opts.dotColor) : opts.dotColor;
       dctx.globalAlpha = (key & 15) / 12;
       const r = (key >> 4) / 4;
@@ -467,6 +471,7 @@ export function mountOrbitHalftone(opts: Opts) {
     dctx.globalAlpha = 1;
     dots.dataset.sizeSteps = String(sizes.size);
     dots.dataset.burstDot = String(biggestBurstDot);
+    dots.dataset.burstDotMean = burstDotCount ? (burstDotSum / burstDotCount).toFixed(2) : '0';
     dots.dataset.maxR = String(max);
     dots.dataset.minR = String(MIN_R);
     dots.dataset.pitch = String(PITCH);
