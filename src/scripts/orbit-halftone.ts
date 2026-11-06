@@ -45,11 +45,12 @@ const BAND = 4.5;
 const PHONE_BAND = 3;
 // Crossing bursts (user): when two lines meet, halftone shoots out along both lines and fades away.
 const MIN_CROSS_ANGLE = (28 * Math.PI) / 180; // shallower meetings are lines running side by side
-const BURST_S = 1.8; // whole life of a burst: a slow spread (user), reaching its end as it fades out
+const BURST_S = 1.8; // life of a full-strength wave: a slow spread (user), reaching its end as it fades out
+const BURST_S_MIN = 1.0; // life of the weakest wave
 const BURST_BAND = 26; // length of the wave crest along the line (σ, px; user: longer)
 const BURST_BAND_PHONE = 13;
-const BURST_REACH = 120; // px along each line, each way
-const BURST_REACH_PHONE = 55;
+const BURST_REACH = 140; // px along each line, each way, for a full-strength wave (weak ones go ~40%)
+const BURST_REACH_PHONE = 62;
 const BURST_WIDTH = 4; // σ at the crossing, px
 const BURST_WIDTH_PHONE = 3.2;
 const BURST_INK = 1.05; // peak ink at the start ≈ full dots, so they start shrinking right away and keep going (user)
@@ -78,8 +79,8 @@ function ring(r: number, ax: number, az: number, n = 160, phase = 0): V3[] {
 type Pt = { x: number; y: number };
 
 /** Where polyline `a` crosses polyline `b` at more than `minAngle`: segment index and position in each (i,t in `a`; j,u in `b`). */
-export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: number; j: number; u: number }[] {
-  const out: { i: number; t: number; j: number; u: number }[] = [];
+export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: number; j: number; u: number; sin: number }[] {
+  const out: { i: number; t: number; j: number; u: number; sin: number }[] = [];
   const sinMin = Math.sin(minAngle);
   for (let i = 1; i < a.length; i++) {
     const p = a[i - 1];
@@ -98,8 +99,9 @@ export function crossings(a: Pt[], b: Pt[], minAngle: number): { i: number; t: n
       const u = ((q.x - p.x) * ry - (q.y - p.y) * rx) / den;
       if (t < 0 || t >= 1 || u < 0 || u >= 1) continue;
       // |sin| of the angle between the two segments.
-      if (Math.abs(den) / (Math.hypot(rx, ry) * Math.hypot(sx, sy)) < sinMin) continue;
-      out.push({ i, t, j, u });
+      const sin = Math.abs(den) / (Math.hypot(rx, ry) * Math.hypot(sx, sy));
+      if (sin < sinMin) continue;
+      out.push({ i, t, j, u, sin });
     }
   }
   return out;
@@ -139,6 +141,20 @@ export function strokeSamples(pts: Pt[], i: number, t: number, half: number, ste
     }
   }
   return out;
+}
+
+/**
+ * How hard a crossing hits (user: 1 angle, 2 depth, 3 several lines), 0…~1.3:
+ * steep crossings (sin of the angle, from the 28° floor up to 90°), in front of the sphere (z from −1 back
+ * to +1 front), and where three or more lines meet (other crossings right next to it) burst harder.
+ */
+export function waveStrength(o: { sin: number; z: number; neighbours: number; minSin?: number }): number {
+  const minSin = o.minSin ?? Math.sin((28 * Math.PI) / 180);
+  const angle = Math.max(0, Math.min(1, (o.sin - minSin) / (1 - minSin)));
+  const front = 0.5 + 0.5 * Math.max(-1, Math.min(1, o.z));
+  // The curve lifts mid angles (crossings on a sphere are mostly fairly shallow) so strong waves still occur.
+  const base = (0.3 + 0.7 * angle ** 0.6) * (0.55 + 0.45 * front);
+  return Math.min(1.3, base * (o.neighbours > 0 ? 1.45 : 1) + (o.neighbours > 0 ? 0.15 : 0));
 }
 
 export type TrackedCrossing = { key: string; x: number; y: number; born: number; seen: number };
@@ -190,7 +206,7 @@ export function mountOrbitHalftone(opts: Opts) {
   const lastRipple = new Map<string, number>(); // per pair of lines
   let lastAnyBurst = -Infinity;
   // Running waves, fixed to a spot on two lines (indices into orbits+ellipses, segment and position on each).
-  let waves: { born: number; a: number; i: number; t: number; b: number; j: number; u: number }[] = [];
+  let waves: { born: number; a: number; i: number; t: number; b: number; j: number; u: number; strength: number }[] = [];
   const kx = new Float32Array(256);
   // Soft edges for free: the dot canvas renders at 0.75× and the browser's upscale blurs it ~0.5px.
   const BLUR = 0.5;
@@ -342,14 +358,14 @@ export function mountOrbitHalftone(opts: Opts) {
     const widest = phone ? BURST_WIDTH_PHONE : BURST_WIDTH;
     const step = PITCH * 0.7;
     const others = [...g.orbits, ...g.centre];
-    const found: { key: string; x: number; y: number; a: Pt[]; i: number; t: number; b: Pt[]; j: number; u: number }[] = [];
+    const found: { key: string; x: number; y: number; a: Pt[]; i: number; t: number; b: Pt[]; j: number; u: number; sin: number }[] = [];
     g.orbits.forEach((orbit, oi) => {
       for (let oj = 0; oj < others.length; oj++) {
         if (oj <= oi) continue; // each orbit pair once; every orbit against both ellipses
         for (const c of crossings(orbit, others[oj], MIN_CROSS_ANGLE)) {
           const p0 = orbit[c.i - 1];
           const p1 = orbit[c.i];
-          found.push({ key: `${oi}-${oj}`, x: p0.x + (p1.x - p0.x) * c.t, y: p0.y + (p1.y - p0.y) * c.t, a: orbit, i: c.i, t: c.t, b: others[oj], j: c.j, u: c.u });
+          found.push({ key: `${oi}-${oj}`, x: p0.x + (p1.x - p0.x) * c.t, y: p0.y + (p1.y - p0.y) * c.t, a: orbit, i: c.i, t: c.t, b: others[oj], j: c.j, u: c.u, sin: c.sin });
         }
       }
     });
@@ -366,18 +382,31 @@ export function mountOrbitHalftone(opts: Opts) {
         lastAnyBurst = t;
         // A wave stays fixed to its spot on both lines, so it keeps travelling even after they part.
         const [oi, oj] = c.key.split('-').map(Number);
-        waves.push({ born: t, a: oi, i: c.i, t: c.t, b: oj, j: c.j, u: c.u });
+        // Strength (user: 1 angle, 2 depth, 3 several lines) sets how far, how long and how dark it goes.
+        const za = (c.a[c.i] as { z?: number }).z ?? 0;
+        const zb = (c.b[c.j] as { z?: number }).z ?? 0;
+        const near = phone ? 10 : 18;
+        const neighbours = found.filter((o) => o !== c && Math.hypot(o.x - c.x, o.y - c.y) < near).length;
+        const strength = waveStrength({ sin: c.sin, z: (za + zb) / 2, neighbours });
+        waves.push({ born: t, a: oi, i: c.i, t: c.t, b: oj, j: c.j, u: c.u, strength });
         dots.dataset.lastBurst = `${Math.round(c.x)},${Math.round(c.y)}`;
+        dots.dataset.lastStrength = strength.toFixed(2);
+        dots.dataset.lastNeighbours = String(neighbours);
       });
     }
-    waves = waves.filter((v) => t - v.born < BURST_S);
+    const lifeOf = (v: { strength: number }) => BURST_S_MIN + (BURST_S - BURST_S_MIN) * Math.min(1.3, v.strength * 1.5);
+    waves = waves.filter((v) => t - v.born < lifeOf(v));
     for (const v of waves) {
+      // Typical strengths run ~0.2–0.7; stretch them so weak waves stay short and faint and strong ones go far.
+      const sv = Math.min(1.3, v.strength * 1.5);
+      const reachV = reach * (0.4 + 0.6 * sv); // weak ≈ 40% of the reach, strong 100%, three lines ~120%
+      const inkV = BURST_INK * (0.6 + 0.4 * Math.min(1, sv)); // weak waves stay small and faint but visible
       // A wave (user): it starts at the crossing, its front travels out along both lines, and the middle
       // empties first. The front eases out to `reach`; the band thins and fades as it goes.
-      const k01 = (t - v.born) / BURST_S;
-      const front = reach * (1 - (1 - k01) ** 2);
-      const band = Math.max(step * 1.2, (phone ? BURST_BAND_PHONE : BURST_BAND) * (1 - 0.5 * k01));
-      const len = Math.min(reach + band, front + 2.5 * band);
+      const k01 = (t - v.born) / lifeOf(v);
+      const front = reachV * (1 - (1 - k01) ** 2);
+      const band = Math.max(step * 1.2, (phone ? BURST_BAND_PHONE : BURST_BAND) * (0.7 + 0.3 * Math.min(1, sv)) * (1 - 0.5 * k01));
+      const len = Math.min(reachV + band, front + 2.5 * band);
       for (const [line, k, f] of [[others[v.a], v.i, v.t], [others[v.b], v.j, v.u]] as const) {
         for (const p of strokeSamples(line, k, f, len, step)) {
           const off = (p.d - front) / band;
@@ -386,7 +415,7 @@ export function mountOrbitHalftone(opts: Opts) {
           // Never thinner than ~0.6 of the dot grid, or the wave falls between grid cells and vanishes early.
           const radius = Math.max(PITCH * 0.6, widest * (0.35 + 0.65 * (1 - k01)));
           // Ink falls steadily over the whole life, so the dots shrink gradually, not only at the end (user).
-          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * BURST_INK * (1 - k01), radius);
+          splat(p.x, p.y, ((wave * step) / (radius * Math.sqrt(2 * Math.PI))) * inkV * (1 - k01), radius);
         }
       }
     }
