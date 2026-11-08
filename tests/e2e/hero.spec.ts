@@ -33,13 +33,20 @@ async function waitForBurst(page: Page, isMobile: boolean) {
 }
 
 test.describe('home graphics', () => {
-  test('JUWON sits at the bottom; a small clock holds the top-right corner', async ({ page }) => {
+  test('JUWON sits at the bottom (phones: under the top bar); a small clock holds the top-right corner', async ({ page, isMobile }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await expect(page.locator('[data-orbit]')).toHaveCount(0);
     const vp = page.viewportSize()!;
     const h1 = (await page.locator('h1').boundingBox())!;
-    expect(h1.y + h1.height).toBeGreaterThan(vp.height * 0.7);
+    if (isMobile) {
+      // Phones (user): JUWON moves up under the top bar, like ARCHIVE (still centred).
+      const bar = (await page.locator('.home .top').boundingBox())!;
+      expect(h1.y).toBeGreaterThan(bar.y + bar.height + 8);
+      expect(h1.y + h1.height).toBeLessThan(vp.height * 0.3);
+    } else {
+      expect(h1.y + h1.height).toBeGreaterThan(vp.height * 0.7);
+    }
     const clock = page.locator('[data-visit-clock]');
     await expect(clock).toHaveText(/\d{2}:\d{2}:\d{2}/);
     const c = (await clock.boundingBox())!;
@@ -94,8 +101,9 @@ test.describe('home graphics', () => {
       return {
         cy: b.top + Number(c.dataset.cy),
         r: Number(c.dataset.r),
-        top: document.querySelector('.home .top')!.getBoundingClientRect().bottom,
-        h1: document.querySelector('.home h1')!.getBoundingClientRect().top,
+        // Phones: the band runs from the readout (under JUWON) down to the subline.
+        top: document.querySelector('[data-readout-m]')!.getBoundingClientRect().bottom,
+        h1: document.querySelector('.home .bar')!.getBoundingClientRect().top,
         w: innerWidth,
       };
     });
@@ -226,7 +234,7 @@ test.describe('home graphics', () => {
     await page.waitForTimeout(1500);
     const readout = page.locator('[data-readout]');
     if (isMobile) {
-      // Phones (user): no axes; the readout splits across the top, a clear gap under the top bar, above the sphere.
+      // Phones (user): no axes; the readout splits across the top, a clear gap under JUWON, above the sphere.
       await expect(readout).toBeHidden();
       await expect(page.locator('canvas[data-trace]')).not.toHaveAttribute('data-axes', 'extended');
       const rm = page.locator('[data-readout-m]');
@@ -251,6 +259,9 @@ test.describe('home graphics', () => {
         return c.getBoundingClientRect().top + Number(c.dataset.cy) - Number(c.dataset.r);
       });
       expect(r.y - (bar.y + bar.height)).toBeGreaterThanOrEqual(12);
+      // ...and under JUWON, which now sits under the top bar (user).
+      const name = (await page.locator('.home h1').boundingBox())!;
+      expect(r.y - (name.y + name.height)).toBeGreaterThanOrEqual(12);
       expect(r.y + r.height).toBeLessThan(sphereTop - 12);
       return;
     }
@@ -390,7 +401,7 @@ const juwonBox = (page: import('@playwright/test').Page) =>
     return { left: b.left, right: b.right, bottom: b.bottom, mid: b.left + b.width / 2, vw: document.documentElement.clientWidth, subLeft: sub.left, subTop: sub.top };
   });
 
-test('phones: JUWON is big and centred (user: A on mobile)', async ({ page, isMobile }) => {
+test('phones: JUWON is big and centred, under the top bar (user)', async ({ page, isMobile }) => {
   test.skip(!isMobile);
   await page.goto('/');
   await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });

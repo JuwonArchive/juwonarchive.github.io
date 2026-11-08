@@ -91,7 +91,18 @@ const site = loadSite();
     /* JUWON's W and O are wider than average, so budget ~0.98em per glyph. */
     --fit-max: 360px;
     --fit-width: (100vw - 2 * var(--gutter)) * 0.86 / 0.98;
-    text-align: center; /* phones: big and centred (user: A) */
+    text-align: center;
+  }
+  /* Phones (user): JUWON moves up under the top bar, like ARCHIVE on the archive page (still big and
+     centred); the sphere takes the space below it. */
+  @media (max-width: 767px) {
+    .top {
+      order: -2;
+    }
+    .headline {
+      order: -1;
+      margin: 20px 0 0;
+    }
   }
   /* Desktop (user: B): a smaller JUWON sits bottom-left, just above the info line,
      leaving the centre to the orbit graphic. */

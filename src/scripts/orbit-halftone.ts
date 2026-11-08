@@ -741,6 +741,12 @@ export function mountOrbitHalftone(opts: Opts) {
   ro.observe(dots);
   // JUWON's height changes when the display font loads.
   if (opts.band) ro.observe(opts.band.below);
+  // Phones: the band's top (the readout under JUWON) can move without anything resizing; the page
+  // fires a resize after placing it.
+  window.addEventListener('resize', () => {
+    resize();
+    if (opts.reducedMotion) draw(0);
+  });
 
   if (opts.reducedMotion) {
     dots.toggleAttribute('data-static', true);

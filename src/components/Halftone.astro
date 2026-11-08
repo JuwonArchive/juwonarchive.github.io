@@ -20,7 +20,7 @@ const markers = loadSite().works.map((w, i) => ({
   <div><dt>LAST WAVE</dt><dd data-ro="last">—</dd></div>
   <div class="gap"><dt>VIEW</dt><dd data-ro="view">—</dd></div>
 </dl>
-<!-- Phones (user): two short columns under the top bar: counts on the left, view angles on the right. -->
+<!-- Phones (user): two short columns under JUWON: counts on the left, view angles on the right. -->
 <p class="readout-m mono" data-readout-m aria-hidden="true" hidden>
   <span data-rm="counts">—</span>
   <span data-rm="view">—</span>
@@ -31,21 +31,31 @@ const markers = loadSite().works.map((w, i) => ({
   const dots = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
   const lines = document.querySelector<HTMLCanvasElement>('canvas[data-trace]');
   const topBar = document.querySelector<HTMLElement>('.home .top');
-  // Phones: the readout sits a clear gap under the top bar, and the sphere's band starts under the readout.
+  const name = document.querySelector<HTMLElement>('.home h1');
+  // Phones (user): JUWON sits under the top bar, the readout a clear gap under JUWON, and the sphere's band
+  // runs from the readout down to the subline. Desktop: the band is unused (JUWON stays bottom-left).
   const rmEl = document.querySelector<HTMLElement>('[data-readout-m]');
   const phoneRo = !!rmEl && matchMedia('(max-width: 767px)').matches;
-  if (rmEl && topBar && phoneRo) {
+  const placeReadout = () => {
+    if (!rmEl || !name || !phoneRo) return;
     rmEl.hidden = false; // shown first: a hidden element has no offsetParent to measure against
     const host = rmEl.offsetParent as HTMLElement | null;
     const hostTop = host ? host.getBoundingClientRect().top : 0;
-    rmEl.style.top = `${topBar.getBoundingClientRect().bottom - hostTop + 16}px`;
-  }
+    rmEl.style.top = `${name.getBoundingClientRect().bottom - hostTop + 16}px`;
+  };
+  placeReadout();
+  // The name's height depends on the display font; re-place once it has loaded and refit the sphere.
+  document.fonts?.ready.then(() => {
+    placeReadout();
+    window.dispatchEvent(new Event('resize'));
+  });
+  window.addEventListener('resize', placeReadout);
   const above = phoneRo ? rmEl : topBar;
-  const below = document.querySelector<HTMLElement>('.home h1');
+  const below = phoneRo ? document.querySelector<HTMLElement>('.home .bar') : name;
   const markers: { label: string; href: string }[] = JSON.parse(lines?.dataset.markers ?? '[]');
   if (dots) {
     mountOrbitHalftone({
-      band: above && below ? { above, below } : null, // phones: sphere sits above JUWON (user: A)
+      band: above && below ? { above, below } : null, // phones: sphere fills the space under the readout
       dots,
       lines,
       dotColor: '#ccd4dd', // a little darker (user)
