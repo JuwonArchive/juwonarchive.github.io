@@ -97,8 +97,8 @@ test.describe('home graphics', () => {
       return {
         cy: b.top + Number(c.dataset.cy),
         r: Number(c.dataset.r),
-        // Phones: the band runs from the readout (under JUWON) down to the subline.
-        top: document.querySelector('[data-readout-m]')!.getBoundingClientRect().bottom,
+        // Phones: the band runs from JUWON (under the top bar) down to the subline.
+        top: document.querySelector('.home h1')!.getBoundingClientRect().bottom,
         h1: document.querySelector('.home .bar')!.getBoundingClientRect().top,
         w: innerWidth,
       };
@@ -134,12 +134,12 @@ test.describe('home graphics', () => {
     await expect.poll(() => inkAround(page, x, y, 50), { timeout: 15_000 }).toBeGreaterThan(before * 2);
   });
 
-  test('light colour, sphere wireframe and dotted guides on the line layer', async ({ page }) => {
+  test('light colour, sphere wireframe and dotted diagonals on the line layer', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(400);
     const lines = page.locator('canvas[data-trace]');
     await expect(lines).toHaveAttribute('data-wire', 'latlong');
-    expect(Number(await lines.getAttribute('data-dotted'))).toBeGreaterThanOrEqual(4);
+    expect(Number(await lines.getAttribute('data-dotted'))).toBe(2); // the diagonals; the axes went (user)
     const color = (await page.locator('canvas[data-halftone]').getAttribute('data-dot-color'))!;
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
     // A little darker than before (user), still a light screen behind the black lines.
@@ -225,58 +225,24 @@ test.describe('home graphics', () => {
     for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) expect(Math.abs(spin[i] - spin[j])).toBeGreaterThan(0.01);
   });
 
-  test('axes run on to the edges and a live readout fills the empty space, fitted to desktop and phones (user)', async ({ page, isMobile }) => {
+  test('no data readout and no axes; the lines keep their wireframe (user)', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1500);
-    const readout = page.locator('[data-readout]');
-    if (isMobile) {
-      // Phones (user): no axes; the readout splits across the top, a clear gap under JUWON, above the sphere.
-      await expect(readout).toBeHidden();
-      await expect(page.locator('canvas[data-trace]')).not.toHaveAttribute('data-axes', 'extended');
-      const rm = page.locator('[data-readout-m]');
-      await expect(rm).toBeVisible();
-      await expect(rm).toContainText(/CROSSINGS \d\d\s+WAVES \d\d/);
-      await expect(rm).toContainText(/YAW .*\s+PITCH/);
-      // Mock D (user): two lines each, counts flush left and view angles flush right, like the top bar.
-      const cols = await rm.evaluate((el) => {
-        const box = el.getBoundingClientRect();
-        const [a, b] = [...el.querySelectorAll('span')].map((s) => s.getBoundingClientRect());
-        return { h: box.height, l: a.left - box.left, r: box.right - b.right, gap: b.left - a.right, top: Math.abs(a.top - b.top) };
-      });
-      expect(cols.h).toBeLessThan(32);
-      expect(cols.l).toBeLessThan(1);
-      expect(cols.r).toBeLessThan(1);
-      expect(cols.gap).toBeGreaterThan(40);
-      expect(cols.top).toBeLessThan(1);
-      const r = (await rm.boundingBox())!;
-      const bar = (await page.locator('.home .top').boundingBox())!;
-      const sphereTop = await page.evaluate(() => {
-        const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
-        return c.getBoundingClientRect().top + Number(c.dataset.cy) - Number(c.dataset.r);
-      });
-      expect(r.y - (bar.y + bar.height)).toBeGreaterThanOrEqual(12);
-      // ...and under JUWON, which now sits under the top bar (user).
-      const name = (await page.locator('.home h1').boundingBox())!;
-      expect(r.y - (name.y + name.height)).toBeGreaterThanOrEqual(12);
-      expect(r.y + r.height).toBeLessThan(sphereTop - 12);
-      return;
-    }
-    await expect(page.locator('[data-readout-m]')).toBeHidden();
-    await expect(page.locator('canvas[data-trace]')).toHaveAttribute('data-axes', 'extended');
-    await expect(readout).toBeVisible();
-    // Live: the orbit values change as the orbits drift.
-    const first = await readout.locator('[data-ro="o0"]').textContent();
-    expect(first).toMatch(/TILT\s?−?\d\.\d\d\s+SPIN/);
-    await expect.poll(() => readout.locator('[data-ro="o0"]').textContent(), { timeout: 6000 }).not.toBe(first);
-    // It sits right of the sphere, clear of it and above the horizontal axis.
-    const box = (await readout.boundingBox())!;
-    const g = await page.evaluate(() => {
-      const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
-      const b = c.getBoundingClientRect();
-      return { right: b.left + Number(c.dataset.cx) + Number(c.dataset.r), axis: b.top + Number(c.dataset.cy) };
+    await page.waitForTimeout(800);
+    await expect(page.locator('[data-readout], [data-readout-m]')).toHaveCount(0);
+    const lines = page.locator('canvas[data-trace]');
+    await expect(lines).toHaveAttribute('data-axes', 'none');
+    await expect(lines).toHaveAttribute('data-wire', 'latlong');
+    // Nothing is drawn far out on the horizontal axis line any more (it used to carry dotted ticks).
+    const ink = await page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>('canvas[data-trace]')!;
+      const d = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+      const k = c.width / c.clientWidth, cy = Number(d.dataset.cy), x = Math.round(c.clientWidth * 0.04);
+      const px = c.getContext('2d')!.getImageData(Math.round(x * k), Math.round((cy - 8) * k), Math.round(12 * k), Math.round(16 * k)).data;
+      let a = 0;
+      for (let i = 3; i < px.length; i += 4) a = Math.max(a, px[i]);
+      return a;
     });
-    expect(box.x).toBeGreaterThan(g.right + 40);
-    expect(box.y + box.height).toBeLessThan(g.axis);
+    expect(ink).toBeLessThan(10);
   });
 
   test('no background fog: plain white page', async ({ page }) => {

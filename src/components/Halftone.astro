@@ -10,52 +10,23 @@ const markers = loadSite().works.map((w, i) => ({
 
 <canvas class="halftone" data-halftone aria-hidden="true"></canvas>
 <canvas class="trace" data-trace data-markers={JSON.stringify(markers)} aria-hidden="true"></canvas>
-<!-- Desktop (user): live readout of the drawing, lab-instrument style. Decorative, so hidden from assistive tech. -->
-<dl class="readout mono" data-readout aria-hidden="true">
-  <div><dt>ORBIT 01</dt><dd data-ro="o0">—</dd></div>
-  <div><dt>ORBIT 02</dt><dd data-ro="o1">—</dd></div>
-  <div><dt>ORBIT 03</dt><dd data-ro="o2">—</dd></div>
-  <div class="gap"><dt>CROSSINGS</dt><dd data-ro="crossings">—</dd></div>
-  <div><dt>WAVES</dt><dd data-ro="waves">—</dd></div>
-  <div><dt>LAST WAVE</dt><dd data-ro="last">—</dd></div>
-  <div class="gap"><dt>VIEW</dt><dd data-ro="view">—</dd></div>
-</dl>
-<!-- Phones (user): two short columns under JUWON: counts on the left, view angles on the right. -->
-<p class="readout-m mono" data-readout-m aria-hidden="true" hidden>
-  <span data-rm="counts">—</span>
-  <span data-rm="view">—</span>
-</p>
-
 <script>
   import { mountOrbitHalftone } from '../scripts/orbit-halftone';
   const dots = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
   const lines = document.querySelector<HTMLCanvasElement>('canvas[data-trace]');
   const topBar = document.querySelector<HTMLElement>('.home .top');
   const name = document.querySelector<HTMLElement>('.home h1');
-  // Phones (user): JUWON sits under the top bar, the readout a clear gap under JUWON, and the sphere's band
-  // runs from the readout down to the subline. Desktop: the band is unused (JUWON stays bottom-left).
-  const rmEl = document.querySelector<HTMLElement>('[data-readout-m]');
-  const phoneRo = !!rmEl && matchMedia('(max-width: 767px)').matches;
-  const placeReadout = () => {
-    if (!rmEl || !name || !phoneRo) return;
-    rmEl.hidden = false; // shown first: a hidden element has no offsetParent to measure against
-    const host = rmEl.offsetParent as HTMLElement | null;
-    const hostTop = host ? host.getBoundingClientRect().top : 0;
-    rmEl.style.top = `${name.getBoundingClientRect().bottom - hostTop + 16}px`;
-  };
-  placeReadout();
-  // The name's height depends on the display font; re-place once it has loaded and refit the sphere.
-  document.fonts?.ready.then(() => {
-    placeReadout();
-    window.dispatchEvent(new Event('resize'));
-  });
-  window.addEventListener('resize', placeReadout);
-  const above = phoneRo ? rmEl : topBar;
-  const below = phoneRo ? document.querySelector<HTMLElement>('.home .bar') : name;
+  // Phones (user): JUWON sits under the top bar and the sphere's band runs from JUWON down to the subline.
+  // Desktop: the band is unused.
+  const phone = matchMedia('(max-width: 767px)').matches;
+  const above = phone ? name : topBar;
+  const below = phone ? document.querySelector<HTMLElement>('.home .bar') : name;
+  // The name's height depends on the display font; refit the sphere once it has loaded.
+  document.fonts?.ready.then(() => window.dispatchEvent(new Event('resize')));
   const markers: { label: string; href: string }[] = JSON.parse(lines?.dataset.markers ?? '[]');
   if (dots) {
     mountOrbitHalftone({
-      band: above && below ? { above, below } : null, // phones: sphere fills the space under the readout
+      band: above && below ? { above, below } : null, // phones: sphere fills the space under JUWON
       dots,
       lines,
       dotColor: '#ccd4dd', // a little darker (user)
@@ -69,48 +40,6 @@ const markers = loadSite().works.map((w, i) => ({
   }
 </script>
 
-<script>
-  // Fill the readout from the artwork's live state, a few times a second.
-  const ro = document.querySelector<HTMLElement>('[data-readout]');
-  const rm = document.querySelector<HTMLElement>('[data-readout-m]');
-  const src = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]');
-  if (rm && src && matchMedia('(max-width: 767px)').matches) {
-    const set = (k: string, v: string) => {
-      const el = rm.querySelector<HTMLElement>(`[data-rm="${k}"]`);
-      if (el && el.textContent !== v) el.textContent = v;
-    };
-    const f = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toFixed(2);
-    const update = () => {
-      const d = src.dataset;
-      set('counts', `CROSSINGS ${String(d.crossings ?? 0).padStart(2, '0')}\nWAVES ${String(d.bursts ?? 0).padStart(2, '0')}`);
-      const [yaw] = (d.pose ?? '0,0').split(',').map(Number);
-      set('view', `YAW ${f(yaw)}\nPITCH ${f(Number(d.tilt ?? 0))}`);
-    };
-    update();
-    setInterval(update, 200);
-  }
-  if (ro && src && matchMedia('(min-width: 768px)').matches) {
-    const set = (k: string, v: string) => {
-      const el = ro.querySelector<HTMLElement>(`[data-ro="${k}"]`);
-      if (el && el.textContent !== v) el.textContent = v;
-    };
-    const fmt = (n: number) => (n >= 0 ? ' ' : '−') + Math.abs(n).toFixed(2);
-    const update = () => {
-      const d = src.dataset;
-      (d.orbitDrift ?? '').split(' ').forEach((o, i) => {
-        const [tilt, spin] = o.split('/').map(Number);
-        if (Number.isFinite(tilt)) set(`o${i}`, `TILT${fmt(tilt)}  SPIN${fmt(((spin % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI))}`);
-      });
-      set('crossings', String(d.crossings ?? 0).padStart(2, '0'));
-      set('waves', String(d.bursts ?? 0).padStart(2, '0'));
-      set('last', d.lastStrength ? `S ${Number(d.lastStrength).toFixed(2)}` : '—');
-      const [yaw] = (d.pose ?? '0,0').split(',').map(Number);
-      set('view', `YAW${fmt(yaw)}  PITCH${fmt(Number(d.tilt ?? 0))}`);
-    };
-    update();
-    setInterval(update, 200);
-  }
-</script>
 
 <style>
   .halftone,
@@ -127,63 +56,5 @@ const markers = loadSite().works.map((w, i) => ({
   .trace {
     z-index: 1;
     opacity: 0.9;
-  }
-  /* Live readout, right of the sphere: tiny muted mono, desktop only. */
-  .readout {
-    position: absolute;
-    z-index: 2;
-    right: var(--gutter);
-    bottom: calc(50% + 24px); /* sits above the horizontal axis line */
-    margin: 0;
-    color: var(--muted);
-    font-size: 10px;
-    line-height: 1.9;
-    pointer-events: none;
-    font-variant-numeric: tabular-nums;
-  }
-  .readout div {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-  }
-  .readout .gap {
-    margin-top: 10px;
-  }
-  .readout dt {
-    margin: 0;
-  }
-  .readout dd {
-    margin: 0;
-    color: var(--ink);
-    white-space: pre;
-  }
-  @media (max-width: 767px) {
-    .readout {
-      display: none;
-    }
-  }
-  .readout-m {
-    position: absolute;
-    z-index: 2;
-    left: var(--gutter);
-    right: var(--gutter);
-    margin: 0;
-    /* Echoes the top bar (user, mock D): counts on the left, view angles right-aligned on the right. */
-    display: flex;
-    justify-content: space-between;
-    color: var(--muted);
-    font-size: 8.5px;
-    line-height: 1.5;
-    pointer-events: none;
-    font-variant-numeric: tabular-nums;
-    white-space: pre;
-  }
-  .readout-m [data-rm='view'] {
-    text-align: right;
-  }
-  @media (min-width: 768px) {
-    .readout-m {
-      display: none;
-    }
   }
 </style>

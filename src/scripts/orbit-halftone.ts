@@ -38,6 +38,16 @@ const RIPPLE_REACH = 120; // px the ring travels
 const RIPPLE_WIDTH = 9; // ring thickness (Gaussian σ, px)
 // The hover halftone fades away after the pointer rests this long, and returns on the next move (user).
 // Sphere tilt in radians (positive looks from below): resting, pointer at the top, pointer at the bottom.
+/** Camera distance in sphere radii: closer = stronger perspective, so the front of each orbit swells (user). */
+export const CAMERA = 2.6;
+/** Apparent radius of the sphere's outline at that distance, as a multiple of R. */
+export const SILHOUETTE = CAMERA / Math.sqrt(CAMERA * CAMERA - 1);
+/** The sphere was fitted at camera 4; scale R so its outline keeps the same size on screen. */
+const PERSPECTIVE_FIT = 4 / Math.sqrt(15) / SILHOUETTE;
+/** Depth cue for a line at nearness n (0 = far side, 1 = near side): width and opacity multipliers.
+ *  The far side stays visible (user: do not wipe the lines out). */
+export const depthWidth = (n: number) => 0.55 + 1.05 * n;
+export const depthAlpha = (n: number) => 0.32 + 0.68 * n ** 1.2;
 const BASE_TILT = 0.32;
 const TILT_TOP = -0.6;
 const TILT_BOTTOM = 0.75;
@@ -278,11 +288,13 @@ export function mountOrbitHalftone(opts: Opts) {
     const mobile = w < 768;
     // Phones (A): the sphere fills the band above JUWON. Desktop (B): centred, a little smaller.
     // 1.12 leaves room for perspective swell and the outer orbits.
-    const R = band
-      ? Math.min((band.bottom - band.top) / 2 / 1.12, w * 0.3) // 25% bigger than the first mock (user)
-      : mobile
-        ? w * 0.44
-        : Math.min(w * 0.17, h * 0.28);
+    const R =
+      PERSPECTIVE_FIT *
+      (band
+        ? Math.min((band.bottom - band.top) / 2 / 1.12, w * 0.3) // 25% bigger than the first mock (user)
+        : mobile
+          ? w * 0.44
+          : Math.min(w * 0.17, h * 0.28));
     const cx = w * 0.5;
     const cy = band ? (band.top + band.bottom) / 2 : h * 0.5;
     const yaw = pose.yaw + t * 0.08;
@@ -291,7 +303,7 @@ export function mountOrbitHalftone(opts: Opts) {
     const project = ([x, y, z]: V3) => {
       [x, z] = [x * cy_ + z * sy_, -x * sy_ + z * cy_];
       [y, z] = [y * cp - z * sp, y * sp + z * cp];
-      const k = 4 / (4 - z);
+      const k = CAMERA / (CAMERA - z);
       return { x: cx + x * R * k, y: cy + y * R * k, z };
     };
     // Each orbit drifts on its own (user): its tilt sways and its plane slowly precesses, at different speeds
@@ -319,6 +331,28 @@ export function mountOrbitHalftone(opts: Opts) {
     ctx.beginPath();
     pts.forEach((p, i) => (i ? ctx.lineTo(p.x * k, p.y * k) : ctx.moveTo(p.x * k, p.y * k)));
     ctx.stroke();
+  };
+  // Depth cue (user: perspective): the near side of a line is thicker and darker, the far side thinner and
+  // lighter, but never gone. Segments are grouped into a few depth steps so each step is one path.
+  const DEPTH_STEPS = 6;
+  const strokeDepth = (ctx: CanvasRenderingContext2D, pts: { x: number; y: number; z: number }[]) => {
+    const lw = ctx.lineWidth;
+    const ga = ctx.globalAlpha;
+    for (let b = 0; b < DEPTH_STEPS; b++) {
+      const n = (b + 0.5) / DEPTH_STEPS;
+      ctx.lineWidth = lw * depthWidth(n);
+      ctx.globalAlpha = ga * depthAlpha(n);
+      ctx.beginPath();
+      for (let i = 1; i < pts.length; i++) {
+        const d = Math.min(DEPTH_STEPS - 1, Math.floor((((pts[i - 1].z + pts[i].z) / 2 + 1) / 2) * DEPTH_STEPS));
+        if (d !== b) continue;
+        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.stroke();
+    }
+    ctx.lineWidth = lw;
+    ctx.globalAlpha = ga;
   };
 
   // Clickable areas (marker + label) for the current frame, page coordinates relative to the canvas.
@@ -565,24 +599,24 @@ export function mountOrbitHalftone(opts: Opts) {
       lctx.lineWidth = 0.8;
       lctx.globalAlpha = LINE_ALPHA;
       lctx.beginPath();
-      lctx.arc(g.cx, g.cy, g.R, 0, TAU);
+      lctx.arc(g.cx, g.cy, g.R * SILHOUETTE, 0, TAU);
       lctx.stroke();
-      for (const o of g.orbits) stroke(lctx, o);
-      for (const o of g.centre) stroke(lctx, o);
+      for (const o of g.orbits) strokeDepth(lctx, o);
+      for (const o of g.centre) strokeDepth(lctx, o);
       lctx.setLineDash([2, 4]);
-      for (const o of g.dashed) stroke(lctx, o);
+      for (const o of g.dashed) strokeDepth(lctx, o);
       lctx.setLineDash([]);
       // Thin latitude/longitude wireframe gives the sphere its form.
       lctx.globalAlpha = 0.3;
       lctx.lineWidth = 0.6;
-      for (const o of g.wire) stroke(lctx, o);
+      for (const o of g.wire) strokeDepth(lctx, o);
       lines.dataset.wire = 'latlong';
-      // Dotted straight guides through the centre: axes and diagonals.
+      // Dotted straight guides through the centre: the diagonals (the axes were removed, user).
       lctx.globalAlpha = 0.7;
       lctx.setLineDash([1, 4]);
       let dotted = 0;
-      for (const ang of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
-        const L = ang % (Math.PI / 2) === 0 ? g.R : g.R * 0.98;
+      for (const ang of [Math.PI / 4, -Math.PI / 4]) {
+        const L = g.R * SILHOUETTE * 0.98;
         lctx.beginPath();
         lctx.moveTo(g.cx - Math.cos(ang) * L, g.cy - Math.sin(ang) * L);
         lctx.lineTo(g.cx + Math.cos(ang) * L, g.cy + Math.sin(ang) * L);
@@ -593,75 +627,7 @@ export function mountOrbitHalftone(opts: Opts) {
       lines.dataset.dotted = String(dotted);
       lctx.lineWidth = 0.8;
       lctx.globalAlpha = LINE_ALPHA;
-      // Ticks at the four cardinal points.
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        lctx.beginPath();
-        lctx.moveTo(g.cx + dx * (g.R + 6), g.cy + dy * (g.R + 6));
-        lctx.lineTo(g.cx + dx * (g.R + 18), g.cy + dy * (g.R + 18));
-        lctx.stroke();
-      }
-      // The axes run on towards the screen edges like a technical drawing — dotted, with ticks and a small label
-      // at each end — so the white reads as layout (user). Phones: finer ticks, the vertical axis runs up to the
-      // top bar and down only as far as the readout under the sphere.
-      // Desktop only: on phones the axes made the small screen busy (user).
-      if (w >= 768) {
-        const phoneAxes = false;
-        const m = phoneAxes ? 16 : 32; // stay clear of the corner text
-        const x0 = m, x1 = w - m;
-        const y0 = phoneAxes && band ? band.top : 72;
-        const y1 = phoneAxes ? g.cy + g.R + 34 : h - 72;
-        const every = phoneAxes ? 20 : 40;
-        const longEvery = phoneAxes ? 100 : 200;
-        lctx.save();
-        lctx.globalAlpha = 0.45;
-        lctx.lineWidth = 0.7;
-        lctx.setLineDash([1, 5]);
-        lctx.beginPath();
-        lctx.moveTo(x0, g.cy);
-        lctx.lineTo(g.cx - g.R - 22, g.cy);
-        lctx.moveTo(g.cx + g.R + 22, g.cy);
-        lctx.lineTo(x1, g.cy);
-        lctx.moveTo(g.cx, y0);
-        lctx.lineTo(g.cx, g.cy - g.R - 22);
-        lctx.moveTo(g.cx, g.cy + g.R + 22);
-        lctx.lineTo(g.cx, y1);
-        lctx.stroke();
-        lctx.setLineDash([]);
-        const tick = (x: number, y: number, horizontal: boolean, long: boolean) => {
-          const l = long ? 6 : 3;
-          lctx.beginPath();
-          if (horizontal) {
-            lctx.moveTo(x, y - l);
-            lctx.lineTo(x, y + l);
-          } else {
-            lctx.moveTo(x - l, y);
-            lctx.lineTo(x + l, y);
-          }
-          lctx.stroke();
-        };
-        for (let d = every; g.cx - d >= x0 || g.cx + d <= x1; d += every) {
-          if (d <= g.R + 22) continue;
-          if (g.cx - d >= x0) tick(g.cx - d, g.cy, true, d % longEvery === 0);
-          if (g.cx + d <= x1) tick(g.cx + d, g.cy, true, d % longEvery === 0);
-        }
-        for (let d = every; g.cy - d >= y0 || g.cy + d <= y1; d += every) {
-          if (d <= g.R + 22) continue;
-          if (g.cy - d >= y0) tick(g.cx, g.cy - d, false, d % longEvery === 0);
-          if (g.cy + d <= y1) tick(g.cx, g.cy + d, false, d % longEvery === 0);
-        }
-        lctx.globalAlpha = 0.6;
-        lctx.font = `${phoneAxes ? 8 : 9}px "Geist Mono Variable", ui-monospace, monospace`;
-        lctx.textBaseline = 'middle';
-        lctx.textAlign = 'left';
-        lctx.fillText('X−', x0, g.cy - 12);
-        lctx.textAlign = 'right';
-        lctx.fillText('X+', x1, g.cy - 12);
-        lctx.textAlign = 'left';
-        lctx.fillText('Y+', g.cx + 8, y0);
-        if (!phoneAxes) lctx.fillText('Y−', g.cx + 8, y1);
-        lctx.restore();
-        lines.dataset.axes = 'extended';
-      }
+      lines.dataset.axes = 'none';
       // Crosshair and nucleus.
       lctx.beginPath();
       lctx.moveTo(g.cx - 14, g.cy);
@@ -727,7 +693,8 @@ export function mountOrbitHalftone(opts: Opts) {
       lines.dataset.lineAlpha = String(LINE_ALPHA);
     }
     dots.dataset.cy = String(Math.round(g.cy));
-    dots.dataset.r = String(Math.round(g.R));
+    // The fitted radius, as before the perspective change (the outline itself is ~3% larger).
+    dots.dataset.r = String(Math.round(g.R / PERSPECTIVE_FIT));
     dots.dataset.pose = `${pose.yaw.toFixed(2)},${pose.pitch.toFixed(2)}`;
     dots.dataset.tilt = (BASE_TILT + pose.pitch).toFixed(2);
     dots.dataset.orbitDrift = ORBIT_DRIFT.map((o) => `${(o.ax + o.sway * Math.sin(t * o.swayRate + o.phase)).toFixed(3)}/${(o.az + o.spin * t).toFixed(3)}`).join(' ');
