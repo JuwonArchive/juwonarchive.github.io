@@ -20,9 +20,11 @@ const site = loadSite();
       </span>
     </header>
     <div class="spacer"></div>
-    <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`} aria-label={config.headline}>
-      {[...config.headline].map((ch, i) => <span class="l" style={`--i:${i}`} aria-hidden="true">{ch}</span>)}
-    </h1>
+    <div class="title">
+      <h1 class="display fit headline" style={`--chars:${longestWord(config.headline)}`} aria-label={config.headline}>
+        {[...config.headline].map((ch, i) => <span class="l" style={`--i:${i}`} aria-hidden="true">{ch}</span>)}
+      </h1>
+    </div>
     <div class="bar">
       <p class="mono subline" data-subline>{config.subline}</p>
       <nav class="ways" aria-label="Main" data-home-nav>
@@ -93,15 +95,22 @@ const site = loadSite();
     --fit-width: (100vw - 2 * var(--gutter)) * 0.86 / 0.98;
     text-align: center;
   }
-  /* Phones (user): JUWON moves up under the top bar, like ARCHIVE on the archive page (still big and
-     centred); the sphere takes the space below it. */
+  /* Phones (user): JUWON sits under the top bar like ARCHIVE on the archive page: the same size,
+     left-aligned (no count beside it, user). The sphere takes the space below. */
   @media (max-width: 767px) {
     .top {
       order: -2;
     }
-    .headline {
+    .title {
       order: -1;
-      margin: 20px 0 0;
+      position: relative;
+      z-index: 2;
+      margin-top: 20px;
+    }
+    .headline {
+      margin: 0 0 0 -0.04em;
+      font-size: clamp(48px, 12vw, 200px); /* = ARCHIVE */
+      text-align: left;
     }
   }
   /* Desktop (user): JUWON sits top-left under the top bar, like ARCHIVE on the archive page,

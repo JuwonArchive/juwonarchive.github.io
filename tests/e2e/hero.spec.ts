@@ -363,13 +363,16 @@ const juwonBox = (page: import('@playwright/test').Page) =>
     return { left: b.left, right: b.right, bottom: b.bottom, mid: b.left + b.width / 2, vw: document.documentElement.clientWidth, subLeft: sub.left, subTop: sub.top };
   });
 
-test('phones: JUWON is big and centred, under the top bar (user)', async ({ page, isMobile }) => {
+test('phones: JUWON sits like ARCHIVE on the archive page: same size, left, no count (user)', async ({ page, isMobile }) => {
   test.skip(!isMobile);
+  await page.goto('/archive');
+  const archive = await page.locator('h1').evaluate((el) => ({ size: getComputedStyle(el).fontSize, left: el.getBoundingClientRect().left }));
   await page.goto('/');
   await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
-  const r = await juwonBox(page);
-  expect(Math.abs(r.mid - r.vw / 2)).toBeLessThan(6);
-  expect(r.right - r.left).toBeGreaterThan(r.vw * 0.8);
+  const home = await page.locator('h1').evaluate((el) => ({ size: getComputedStyle(el).fontSize, left: el.getBoundingClientRect().left }));
+  expect(home.size).toBe(archive.size);
+  expect(Math.abs(home.left - archive.left)).toBeLessThan(3);
+  await expect(page.locator('.home .count')).toHaveCount(0); // the number beside it was dropped (user)
 });
 
 test('desktop: smaller JUWON sits top-left under the top bar, clear of the sphere (user)', async ({ page, isMobile }) => {
