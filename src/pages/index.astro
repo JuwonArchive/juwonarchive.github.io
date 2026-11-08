@@ -104,13 +104,13 @@ const site = loadSite();
       margin: 20px 0 0;
     }
   }
-  /* Desktop (user: B): a smaller JUWON sits bottom-left, just above the info line,
+  /* Desktop (user): JUWON sits top-left under the top bar, like ARCHIVE on the archive page,
      leaving the centre to the orbit graphic. */
   @media (min-width: 768px) {
     .headline {
       position: absolute;
       left: var(--gutter);
-      bottom: calc(var(--gutter) + 34px);
+      top: calc(var(--gutter) + 40px);
       margin: 0;
       text-align: left;
       font-size: clamp(48px, 8vw, 132px); /* a little bigger (user) */

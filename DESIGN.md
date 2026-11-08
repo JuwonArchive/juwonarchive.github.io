@@ -181,7 +181,7 @@ Mono row: `ILSAN, KOREA` · live `HH:MM KST` · email.
 
 - The orbit markers are the archive boxes: `01 3D DESIGN` … (muted number, ink title, the same caption as the box) and each one opens its box.
 - The sphere keeps its original ink line art (an acrylic glass / box-edge-colour variant was tried and reverted, user).
-- Desktop JUWON (bottom-left, above the info line) is `clamp(48px, 8vw, 132px)`.
+- Desktop JUWON is `clamp(48px, 8vw, 132px)`; since 2026-11-08 it sits top-left under the top bar like ARCHIVE on the archive page (user), phones likewise (big and centred).
 
 ## Halftone and media size (2026-11-05)
 

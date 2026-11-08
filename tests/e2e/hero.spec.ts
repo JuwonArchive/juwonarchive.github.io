@@ -33,20 +33,16 @@ async function waitForBurst(page: Page, isMobile: boolean) {
 }
 
 test.describe('home graphics', () => {
-  test('JUWON sits at the bottom (phones: under the top bar); a small clock holds the top-right corner', async ({ page, isMobile }) => {
+  test('JUWON sits under the top bar; a small clock holds the top-right corner', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/');
     await expect(page.locator('[data-orbit]')).toHaveCount(0);
     const vp = page.viewportSize()!;
     const h1 = (await page.locator('h1').boundingBox())!;
-    if (isMobile) {
-      // Phones (user): JUWON moves up under the top bar, like ARCHIVE (still centred).
-      const bar = (await page.locator('.home .top').boundingBox())!;
-      expect(h1.y).toBeGreaterThan(bar.y + bar.height + 8);
-      expect(h1.y + h1.height).toBeLessThan(vp.height * 0.3);
-    } else {
-      expect(h1.y + h1.height).toBeGreaterThan(vp.height * 0.7);
-    }
+    // JUWON sits under the top bar, like ARCHIVE on the archive page (user: phones, then desktop).
+    const bar = (await page.locator('.home .top').boundingBox())!;
+    expect(h1.y).toBeGreaterThan(bar.y + bar.height + 8);
+    expect(h1.y + h1.height).toBeLessThan(vp.height * 0.3);
     const clock = page.locator('[data-visit-clock]');
     await expect(clock).toHaveText(/\d{2}:\d{2}:\d{2}/);
     const c = (await clock.boundingBox())!;
@@ -410,7 +406,7 @@ test('phones: JUWON is big and centred, under the top bar (user)', async ({ page
   expect(r.right - r.left).toBeGreaterThan(r.vw * 0.8);
 });
 
-test('desktop: smaller JUWON sits left, just above the info line (user: B)', async ({ page, isMobile }) => {
+test('desktop: smaller JUWON sits top-left under the top bar, clear of the sphere (user)', async ({ page, isMobile }) => {
   test.skip(isMobile);
   await page.goto('/');
   await expect(page.locator('[data-intro]')).toBeHidden({ timeout: 4000 });
@@ -418,8 +414,14 @@ test('desktop: smaller JUWON sits left, just above the info line (user: B)', asy
   expect(Math.abs(r.left - r.subLeft)).toBeLessThan(12);
   expect(r.right - r.left).toBeLessThan(r.vw * 0.42);
   expect(r.right - r.left).toBeGreaterThan(r.vw * 0.33); // a little bigger than before (user)
-  expect(r.bottom).toBeLessThanOrEqual(r.subTop + 2);
-  expect(r.subTop - r.bottom).toBeLessThan(40);
+  const bar = (await page.locator('.home .top').boundingBox())!;
+  expect(r.bottom).toBeLessThan(bar.y + bar.height + 180);
+  // The sphere's outline stays below the name.
+  const sphereTop = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>('canvas[data-halftone]')!;
+    return c.getBoundingClientRect().top + Number(c.dataset.cy) - Number(c.dataset.r);
+  });
+  expect(sphereTop).toBeGreaterThan(r.bottom);
 });
 
 test('phones use smaller halftone dots (user)', async ({ page, isMobile }) => {
